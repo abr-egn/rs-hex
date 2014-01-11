@@ -36,24 +36,27 @@ pub fn distance(a: Hex, b: Hex) -> int {
 #[deriving(Eq, ToStr)]
 pub enum Direction { XY, XZ, YZ, YX, ZX, ZY }
 
-struct DirIter { d: Direction }
+struct DirIter { next: Option<Direction> }
 
 impl Direction {
-  pub fn all() -> DirIter { DirIter { d: XY } }
+  pub fn all() -> DirIter { DirIter { next: Some(XY) } }
 }
 
 impl Iterator<Direction> for DirIter {
   fn next(&mut self) -> Option<Direction> {
-    let new_d = match self.d {
-      XY => XZ,
-      XZ => YZ,
-      YZ => YX,
-      YX => ZX,
-      ZX => ZY,
-      ZY => return None
+    let val = self.next;
+    self.next = match val {
+      None => None,
+      Some(o) => match o {
+        XY => Some(XZ),
+        XZ => Some(YZ),
+        YZ => Some(YX),
+        YX => Some(ZX),
+        ZX => Some(ZY),
+        ZY => None
+      }
     };
-    self.d = new_d;
-    Some(new_d)
+    val
   }
 }
 
@@ -75,6 +78,10 @@ pub struct Region { center: Hex, radius: int }
 
 impl Region {
   pub fn contains(self, h: Hex) -> bool { distance(self.center, h) <= self.radius }
+  pub fn ring(self) -> ~[Hex] {
+    let sides = [(XY, YZ), (XZ, YZ), (YZ, ZX), (YX, ZY), (ZX, XY), (ZY, XZ)];
+    sides.flat_map(|&(start, dir)| line(self.center + start.delta()*self.radius, dir, self.radius))
+  }
 }
 
 impl Hex {
@@ -83,6 +90,6 @@ impl Hex {
   }
 }
 
-pub fn line(start: Hex, dir: Direction, len: int) -> ~[Hex] {
-  ~[]
+pub fn line(start: Hex, dir: Direction, dist: int) -> ~[Hex] {
+  std::iter::range(1, dist).map(|d| start + dir.delta()*d).collect()
 }
