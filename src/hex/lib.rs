@@ -1,9 +1,9 @@
 #[desc = "Hex grids"];
 #[license = "MIT"];
 
-#[deriving(Eq, Zero, ToStr)]
+#[deriving(Eq, Zero, ToStr, Clone)]
 pub struct Hex { x: int, y: int, z: int }
-#[deriving(Eq, Zero, ToStr)]
+#[deriving(Eq, Zero, ToStr, Clone)]
 pub struct Delta { dx: int, dy: int, dz: int }
 
 impl Add<Delta, Hex> for Hex {
@@ -33,7 +33,7 @@ pub fn distance(a: Hex, b: Hex) -> int {
   values[0]+values[1]
 }
 
-#[deriving(Eq, ToStr)]
+#[deriving(Eq, ToStr, Clone)]
 pub enum Direction { XY, XZ, YZ, YX, ZX, ZY }
 
 struct DirIter { next: Option<Direction> }
@@ -73,14 +73,26 @@ impl Direction {
   }
 }
 
-#[deriving(Eq, ToStr)]
+#[deriving(Eq, ToStr, Clone)]
 pub struct Region { center: Hex, radius: int }
 
 impl Region {
   pub fn contains(self, h: Hex) -> bool { distance(self.center, h) <= self.radius }
   pub fn ring(self) -> ~[Hex] {
     let sides = [(XY, YZ), (XZ, YZ), (YZ, ZX), (YX, ZY), (ZX, XY), (ZY, XZ)];
-    sides.flat_map(|&(start, dir)| line(self.center + start.delta()*self.radius, dir, self.radius))
+    let mut hexes = ~[];
+    for &(start, dir) in sides.iter() {
+      hexes.push_all_move(line(self.center + start.delta()*self.radius, dir, self.radius));
+    }
+    hexes
+  }
+  pub fn area(self) -> ~[Hex] {
+    let mut hexes = ~[];
+    for r in std::iter::range_inclusive(0, self.radius) {
+      let tmp = Region {center: self.center, radius: r};
+      hexes.push_all_move(tmp.ring());
+    }
+    hexes
   }
 }
 
@@ -91,5 +103,5 @@ impl Hex {
 }
 
 pub fn line(start: Hex, dir: Direction, dist: int) -> ~[Hex] {
-  std::iter::range(1, dist).map(|d| start + dir.delta()*d).collect()
+  std::iter::range_inclusive(1, dist).map(|d| start + dir.delta()*d).collect()
 }
