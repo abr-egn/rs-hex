@@ -1,3 +1,6 @@
+#[desc = "Hex grids"];
+#[license = "MIT"];
+
 #[deriving(Eq, Zero, ToStr)]
 pub struct Hex { x: int, y: int, z: int }
 #[deriving(Eq, Zero, ToStr)]
