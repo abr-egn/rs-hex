@@ -79,7 +79,7 @@ pub struct Region { center: Hex, radius: uint }
 impl Region {
   pub fn contains(self, h: Hex) -> bool { distance(self.center, h) <= self.radius }
   pub fn ring(self) -> ~[Hex] {
-    let sides = [(XY, YZ), (XZ, YZ), (YZ, ZX), (YX, ZY), (ZX, XY), (ZY, XZ)];
+    let sides = [(XY, YZ), (XZ, YX), (YZ, ZX), (YX, ZY), (ZX, XY), (ZY, XZ)];
     let mut hexes = ~[];
     for &(start, dir) in sides.iter() {
       hexes.push_all_move(line(self.center + start.delta()*(self.radius as int), dir, self.radius));
