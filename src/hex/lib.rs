@@ -1,9 +1,9 @@
 #[desc = "Hex grids"];
 #[license = "MIT"];
 
-#[deriving(Eq, Zero, ToStr, Clone, IterBytes)]
+#[deriving(Eq, TotalEq, Zero, ToStr, Clone, IterBytes, Ord, TotalOrd)]
 pub struct Hex { x: int, y: int, z: int }
-#[deriving(Eq, Zero, ToStr, Clone, IterBytes)]
+#[deriving(Eq, TotalEq, Zero, ToStr, Clone, IterBytes, Ord, TotalOrd)]
 pub struct Delta { dx: int, dy: int, dz: int }
 
 impl Add<Delta, Hex> for Hex {
@@ -33,7 +33,7 @@ pub fn distance(a: Hex, b: Hex) -> int {
   values[0]+values[1]
 }
 
-#[deriving(Eq, ToStr, Clone)]
+#[deriving(Eq, TotalEq, ToStr, Clone)]
 pub enum Direction { XY, XZ, YZ, YX, ZX, ZY }
 
 struct DirIter { next: Option<Direction> }
@@ -73,7 +73,7 @@ impl Direction {
   }
 }
 
-#[deriving(Eq, ToStr, Clone)]
+#[deriving(Eq, TotalEq, ToStr, Clone)]
 pub struct Region { center: Hex, radius: int }
 
 impl Region {

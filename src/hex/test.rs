@@ -43,11 +43,11 @@ impl Arbitrary for Hex {
   }
 }
 
-impl Arbitrary for (Hex, Hex) {
-  fn get() -> (Hex, Hex) { (Arbitrary::get(), Arbitrary::get()) }
-  fn narrow(self) -> Option<(Hex, Hex)> {
+impl<A: Arbitrary, B: Arbitrary> Arbitrary for (A, B) {
+  fn get() -> (A, B) { (Arbitrary::get(), Arbitrary::get()) }
+  fn narrow(self) -> Option<(A, B)> {
     let (a, b) = self;
-    match (a.narrow(), b.narrow()) {
+    match (a.clone().narrow(), b.clone().narrow()) {
       (Some(a2), Some(b2)) => Some((a2, b2)),
       (Some(a2), None) => Some((a2, b)),
       (None, Some(b2)) => Some((a, b2)),
@@ -111,5 +111,23 @@ fn overlap_neighbors() {
 fn non_negative_distance() {
   run_test::<(Hex, Hex)>(|(a, b)| {
     hex::distance(a, b) >= 0
+  });
+}
+
+#[test]
+fn neighbor_distance() {
+  test_neighbors(|p, n, _| {
+    hex::distance(p, n) == 1
+  });
+}
+
+#[test]
+fn neighbor_direction() {
+  run_test::<Hex>(|p| {
+    let mut ds: ~[Hex] = hex::Direction::all().map(|d| p + d.delta()).collect();
+    ds.sort();
+    let mut ns = p.neighbors();
+    ns.sort();
+    ds == ns
   });
 }
