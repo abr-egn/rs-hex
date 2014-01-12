@@ -24,16 +24,16 @@ impl Mul<int, Delta> for Delta {
   }
 }
 
-pub fn distance(a: Hex, b: Hex) -> int {
+pub fn distance(a: Hex, b: Hex) -> uint {
   use std::num::abs;
 
   let Delta {dx, dy, dz} = a - b;
-  let mut values = [abs(dx), abs(dy), abs(dz)];
+  let mut values = [abs(dx) as uint, abs(dy) as uint, abs(dz) as uint];
   values.sort();
   values[0]+values[1]
 }
 
-#[deriving(Eq, TotalEq, ToStr, Clone)]
+#[deriving(Eq, TotalEq, ToStr, Clone, Rand)]
 pub enum Direction { XY, XZ, YZ, YX, ZX, ZY }
 
 struct DirIter { next: Option<Direction> }
@@ -74,7 +74,7 @@ impl Direction {
 }
 
 #[deriving(Eq, TotalEq, ToStr, Clone)]
-pub struct Region { center: Hex, radius: int }
+pub struct Region { center: Hex, radius: uint }
 
 impl Region {
   pub fn contains(self, h: Hex) -> bool { distance(self.center, h) <= self.radius }
@@ -82,7 +82,7 @@ impl Region {
     let sides = [(XY, YZ), (XZ, YZ), (YZ, ZX), (YX, ZY), (ZX, XY), (ZY, XZ)];
     let mut hexes = ~[];
     for &(start, dir) in sides.iter() {
-      hexes.push_all_move(line(self.center + start.delta()*self.radius, dir, self.radius));
+      hexes.push_all_move(line(self.center + start.delta()*(self.radius as int), dir, self.radius));
     }
     hexes
   }
@@ -102,6 +102,6 @@ impl Hex {
   }
 }
 
-pub fn line(start: Hex, dir: Direction, dist: int) -> ~[Hex] {
-  std::iter::range_inclusive(1, dist).map(|d| start + dir.delta()*d).collect()
+pub fn line(start: Hex, dir: Direction, dist: uint) -> ~[Hex] {
+  std::iter::range_inclusive(1, dist).map(|d| start + dir.delta()*(d as int)).collect()
 }
