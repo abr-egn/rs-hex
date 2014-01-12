@@ -1,9 +1,9 @@
 #[desc = "Hex grids"];
 #[license = "MIT"];
 
-#[deriving(Eq, Zero, ToStr, Clone)]
+#[deriving(Eq, Zero, ToStr, Clone, IterBytes)]
 pub struct Hex { x: int, y: int, z: int }
-#[deriving(Eq, Zero, ToStr, Clone)]
+#[deriving(Eq, Zero, ToStr, Clone, IterBytes)]
 pub struct Delta { dx: int, dy: int, dz: int }
 
 impl Add<Delta, Hex> for Hex {

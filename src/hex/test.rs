@@ -1,10 +1,12 @@
 extern mod hex;
 
 use std::rand::random;
+use std::hashmap::HashSet;
+use std::iter::FromIterator;
 
 use hex::Hex;
 
-trait Arbitrary : ToStr {
+trait Arbitrary : ToStr + Clone {
   fn get() -> Self;
   fn narrow(self) -> Option<Self> { None }
 }
@@ -22,7 +24,7 @@ impl Arbitrary for int {
 
 impl Arbitrary for Hex {
   fn get() -> Hex {
-    let x: int = Arbitrary::get();
+    let x = Arbitrary::get();
     let y: int = Arbitrary::get();
     Hex {x: x, y: y, z: 0 - (x+y)}
   }
@@ -35,7 +37,7 @@ impl Arbitrary for Hex {
   }
 }
 
-fn run_test<T: Arbitrary + Clone>(f: |T| -> bool) {
+fn run_test<T: Arbitrary>(f: |T| -> bool) {
   for _ in std::iter::range(0, 100) {
     let val: T = Arbitrary::get();
     if !f(val.clone()) {
@@ -56,15 +58,33 @@ fn run_test<T: Arbitrary + Clone>(f: |T| -> bool) {
 
 #[test]
 fn six_neighbors() {
-  run_test::<Hex>(|hex| { hex.neighbors().len() == 5 });
-  // Q: why does the "do" syntactic sugar require a fn that takes a proc?
-  /*
+  run_test::<Hex>(|hex| { hex.neighbors().len() == 6 });
+}
+
+fn test_neighbors(f: |Hex, Hex, &[Hex]| -> bool) {
   run_test::<Hex>(|hex| {
-    assert_eq!(6, hex.neighbors().len());
+    let ns = hex.neighbors();
+    ns.iter().all(|n| {
+      let nns = n.neighbors();
+      f(hex, *n, nns)
+    })
   });
-  */
 }
 
 #[test]
 fn transitive_neighbors() {
+  test_neighbors(|hex, n, _| {
+    let nns = n.neighbors();
+    nns.iter().any(|nn| *nn == hex)
+  });
+}
+
+#[test]
+fn overlap_neighbors() {
+  test_neighbors(|_, n, ns| {
+    let nns = n.neighbors();
+    let ns_set: HashSet<&Hex> = FromIterator::from_iterator(&mut ns.iter());
+    let nns_set: HashSet<&Hex> = FromIterator::from_iterator(&mut nns.iter());
+    ns_set.intersection(&nns_set).len() == 2
+  });
 }
