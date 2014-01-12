@@ -7,6 +7,7 @@ use std::hashmap::HashSet;
 
 use hex::Hex;
 use hex::Direction;
+use hex::Region;
 
 trait Arbitrary : ToStr + Clone {
   fn get() -> Self;
@@ -78,36 +79,53 @@ impl<A: Arbitrary, B: Arbitrary, C: Arbitrary> Arbitrary for (A, B, C) {
   }
 }
 
-fn run_test<T: Arbitrary>(f: |T| -> bool) {
+struct Result {
+  note: ~str,
+  value: bool
+}
+
+fn result(v: bool) -> Result { Result { note: ~"", value: v } }
+fn note(v: bool, s: ~str) -> Result { Result { note: s, value: v } }
+
+fn run_test<T: Arbitrary>(f: |T| -> Result) {
   for _ in std::iter::range(0, 100) {
     let val: T = Arbitrary::get();
-    if !f(val.clone()) {
+    let mut result = f(val.clone());
+    if !result.value {
       let mut failing = val;
       loop {
         match failing.clone().narrow() {
           None => break,
           Some(v) => {
-            if f(v.clone()) { break }
-            else { failing = v }
+            let r = f(v.clone());
+            if r.value { break }
+            else {
+              result = r;
+              failing = v;
+            }
           }
         }
       }
-      fail!(failing.to_str())
+      if (result.note == ~"") {
+        fail!(failing.to_str())
+      } else {
+        fail!("{} ({})", failing.to_str(), result.note)
+      }
     }
   }
 }
 
 #[test]
 fn six_neighbors() {
-  run_test::<Hex>(|hex| { hex.neighbors().len() == 6 });
+  run_test::<Hex>(|hex| { result(hex.neighbors().len() == 6) });
 }
 
 fn test_neighbors(f: |Hex, Hex, &[Hex]| -> bool) {
   run_test::<Hex>(|hex| {
     let ns = hex.neighbors();
-    ns.iter().all(|n| {
+    result(ns.iter().all(|n| {
       f(hex, *n, ns)
-    })
+    }))
   });
 }
 
@@ -143,7 +161,7 @@ fn neighbor_direction() {
     ds.sort();
     let mut ns = p.neighbors();
     ns.sort();
-    ds == ns
+    result(ds == ns)
   });
 }
 
@@ -167,6 +185,93 @@ impl Arbitrary for SmallPositiveInt {
 #[test]
 fn line_length() {
   run_test::<(Hex, Direction, SmallPositiveInt)>(|(h, d, SmallPositiveInt(i))|
-    hex::line(h, d, i).len() == i
+    result(hex::line(h, d, i).len() == i)
   );
+}
+
+#[test]
+fn line_delta() {
+  run_test::<(Hex, Direction, SmallPositiveInt)>(|(h, d, SmallPositiveInt(i))| {
+    let line = hex::line(h, d, i);
+    let mut prev = h;
+    result(line.iter().all(|&pt| {
+      let cmp = (pt - prev) == d.delta();
+      prev = pt;
+      cmp
+    }))
+  });
+}
+
+#[deriving(Clone, ToStr)]
+struct SmallNonNegativeInt(uint);
+
+impl Arbitrary for SmallNonNegativeInt {
+  fn get() -> SmallNonNegativeInt { SmallNonNegativeInt(bounded(0u, 1000u)) }
+  fn narrow(self) -> Option<SmallNonNegativeInt> {
+    match self {
+      SmallNonNegativeInt(0) => None,
+      SmallNonNegativeInt(1) => Some(SmallNonNegativeInt(0)),
+      SmallNonNegativeInt(v) => Some(SmallNonNegativeInt(v/2))
+    }
+  }
+}
+
+impl Arbitrary for Region {
+  fn get() -> Region {
+    let center: Hex = Arbitrary::get();
+    let SmallNonNegativeInt(radius): SmallNonNegativeInt = Arbitrary::get();
+    Region { center: center, radius: radius }
+  }
+  fn narrow(self) -> Option<Region> {
+    match (self.center.narrow(), SmallNonNegativeInt(self.radius).narrow()) {
+      (Some(c), Some(SmallNonNegativeInt(r))) => Some(Region { center: c, radius: r }),
+      (Some(c), None) => Some(Region { center: c, radius: self.radius }),
+      (None, Some(SmallNonNegativeInt(r))) => Some(Region { center: self.center, radius: r }),
+      _ => None
+    }
+  }
+}
+
+#[test]
+fn contains_center() {
+  run_test::<Region>(|r| { result(r.contains(r.center)) });
+}
+
+#[test]
+fn contains_other() {
+  run_test::<(Hex, Hex)>(|(p1, p2)| {
+    let r = Region { center: p1, radius: hex::distance(p1, p2) };
+    result(r.contains(p2))
+  });
+}
+
+#[test]
+fn ring_len() {
+  fn expected(r: uint) -> uint {
+    match r {
+      0 => 1,
+      x => x*6
+    }
+  }
+  run_test::<Region>(|r| result(r.ring().len() == expected(r.radius)));
+}
+
+fn all<T, I: Iterator<T>>(i: &mut I, f: |T| -> Result) -> Result {
+  for v in *i {
+    let r = f(v);
+    if !r.value { return r }
+  }
+  result(true)
+}
+
+#[test]
+fn ring_distance() {
+  run_test::<Region>(|r| {
+    let ring = r.ring();
+    all(&mut ring.iter(), |&h| {
+      let dist = hex::distance(r.center, h);
+      note(dist == r.radius,
+           format!("hex={:?} distance={:?}", h, dist))
+    })
+  });
 }
