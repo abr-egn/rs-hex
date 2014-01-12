@@ -2,7 +2,6 @@ extern mod hex;
 
 use std::rand::random;
 use std::hashmap::HashSet;
-use std::iter::FromIterator;
 
 use hex::Hex;
 
@@ -65,8 +64,7 @@ fn test_neighbors(f: |Hex, Hex, &[Hex]| -> bool) {
   run_test::<Hex>(|hex| {
     let ns = hex.neighbors();
     ns.iter().all(|n| {
-      let nns = n.neighbors();
-      f(hex, *n, nns)
+      f(hex, *n, ns)
     })
   });
 }
@@ -83,8 +81,8 @@ fn transitive_neighbors() {
 fn overlap_neighbors() {
   test_neighbors(|_, n, ns| {
     let nns = n.neighbors();
-    let ns_set: HashSet<&Hex> = FromIterator::from_iterator(&mut ns.iter());
-    let nns_set: HashSet<&Hex> = FromIterator::from_iterator(&mut nns.iter());
+    let ns_set: HashSet<&Hex> = ns.iter().collect();
+    let nns_set: HashSet<&Hex> = nns.iter().collect();
     ns_set.intersection(&nns_set).len() == 2
   });
 }
