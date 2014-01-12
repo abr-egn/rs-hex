@@ -1,6 +1,8 @@
 extern mod hex;
 
 use std::rand::random;
+use std::rand::distributions::range::Range;
+use std::rand::distributions::range::SampleRange;
 use std::hashmap::HashSet;
 
 use hex::Hex;
@@ -21,16 +23,34 @@ impl Arbitrary for int {
   }
 }
 
+fn bounded<T: SampleRange + Ord>(min: T, max: T) -> T {
+  let r = Range::new(min, max);
+  SampleRange::sample_range(&r, &mut std::rand::task_rng())
+}
+
 impl Arbitrary for Hex {
   fn get() -> Hex {
-    let x = Arbitrary::get();
-    let y: int = Arbitrary::get();
+    let x = bounded(-1000, 1000);
+    let y = bounded(-1000, 1000);
     Hex {x: x, y: y, z: 0 - (x+y)}
   }
   fn narrow(self) -> Option<Hex> {
     let Hex {x, y, ..} = self;
     match (x.narrow(), y.narrow()) {
       (Some(x2), Some(y2)) => Some(Hex {x: x2, y: y2, z: 0 - (x2+y2)}),
+      _ => None
+    }
+  }
+}
+
+impl Arbitrary for (Hex, Hex) {
+  fn get() -> (Hex, Hex) { (Arbitrary::get(), Arbitrary::get()) }
+  fn narrow(self) -> Option<(Hex, Hex)> {
+    let (a, b) = self;
+    match (a.narrow(), b.narrow()) {
+      (Some(a2), Some(b2)) => Some((a2, b2)),
+      (Some(a2), None) => Some((a2, b)),
+      (None, Some(b2)) => Some((a, b2)),
       _ => None
     }
   }
@@ -84,5 +104,12 @@ fn overlap_neighbors() {
     let ns_set: HashSet<&Hex> = ns.iter().collect();
     let nns_set: HashSet<&Hex> = nns.iter().collect();
     ns_set.intersection(&nns_set).len() == 2
+  });
+}
+
+#[test]
+fn non_negative_distance() {
+  run_test::<(Hex, Hex)>(|(a, b)| {
+    hex::distance(a, b) >= 0
   });
 }
