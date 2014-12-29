@@ -1,64 +1,58 @@
-#[desc = "Hex grids"];
-#[license = "MIT"];
-
-#[deriving(Eq, TotalEq, Zero, ToStr, Clone, IterBytes, Ord, TotalOrd)]
-pub struct Hex { x: int, y: int, z: int }
-#[deriving(Eq, TotalEq, Zero, ToStr, Clone, IterBytes, Ord, TotalOrd)]
-pub struct Delta { dx: int, dy: int, dz: int }
+#[deriving(PartialEq, Eq, Copy)]
+pub struct Hex { pub x: int, pub y: int, pub z: int }
+#[deriving(PartialEq, Eq, Copy)]
+pub struct Delta { pub dx: int, pub dy: int, pub dz: int }
 
 impl Add<Delta, Hex> for Hex {
-  fn add(&self, &Delta {dx, dy, dz}: &Delta) -> Hex {
+  fn add(self, Delta {dx, dy, dz}: Delta) -> Hex {
     Hex {x: self.x+dx, y: self.y+dy, z: self.z+dz}
   }
 }
 
 impl Sub<Hex, Delta> for Hex {
-  fn sub(&self, &Hex {x, y, z}: &Hex) -> Delta {
+  fn sub(self, Hex {x, y, z}: Hex) -> Delta {
     Delta {dx: self.x-x, dy: self.y-y, dz: self.z-z}
   }
 }
 
 impl Mul<int, Delta> for Delta {
-  fn mul(&self, &f: &int) -> Delta {
+  fn mul(self, f: int) -> Delta {
     Delta {dx: self.dx*f, dy: self.dy*f, dz: self.dz*f}
   }
 }
 
 pub fn distance(a: Hex, b: Hex) -> uint {
-  use std::num::abs;
+  use std::num::SignedInt;    // for .abs()
 
   let Delta {dx, dy, dz} = a - b;
-  let mut values = [abs(dx) as uint, abs(dy) as uint, abs(dz) as uint];
+  let mut values = [dx.abs() as uint, dy.abs() as uint, dz.abs() as uint];
   values.sort();
   values[0]+values[1]
 }
 
-#[deriving(Eq, TotalEq, ToStr, Clone, Rand)]
+#[deriving(PartialEq, Eq, Copy)]
 pub enum Direction { XY, XZ, YZ, YX, ZX, ZY }
 
-struct DirIter { next: Option<Direction> }
+static DIRECTIONS: [Direction, ..6] = [Direction::XY, Direction::XZ, Direction::YZ, Direction::YX, Direction::ZX, Direction::ZY];
+
+#[deriving(Copy)]
+pub struct DirIter {
+  inner: std::slice::Iter<'static, Direction>
+}
 
 impl Direction {
-  pub fn all() -> DirIter { DirIter { next: Some(XY) } }
+  pub fn all() -> std::slice::Iter<'static, Direction> { DIRECTIONS.iter() }
 }
 
 impl Iterator<Direction> for DirIter {
   fn next(&mut self) -> Option<Direction> {
-    let val = self.next;
-    self.next = match val {
+    match self.inner.next() {
       None => None,
-      Some(o) => match o {
-        XY => Some(XZ),
-        XZ => Some(YZ),
-        YZ => Some(YX),
-        YX => Some(ZX),
-        ZX => Some(ZY),
-        ZY => None
-      }
-    };
-    val
+      Some(&d) => Some(d)
+    }
   }
 }
+/*
 
 impl Direction {
   pub fn delta(self) -> Delta {
@@ -105,3 +99,4 @@ impl Hex {
 pub fn line(start: Hex, dir: Direction, dist: uint) -> ~[Hex] {
   std::iter::range_inclusive(1, dist).map(|d| start + dir.delta()*(d as int)).collect()
 }
+*/

@@ -1,0 +1,5 @@
+[package]
+
+name = "hex"
+version = "0.0.1"
+authors = ["Abraham Egnor <abe.egnor@gmail.com>"]

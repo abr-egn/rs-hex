@@ -2,3 +2,5 @@
 build
 .*.swp
 lib
+Cargo.lock
+target

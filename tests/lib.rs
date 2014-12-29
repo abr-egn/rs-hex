@@ -1,3 +1,12 @@
+extern crate hex;
+
+#[test]
+fn foo() {
+  let p = hex::Hex {x: 0, y: 0, z: 0};
+  assert_eq!(0, p.x);
+}
+
+/*
 extern mod hex;
 
 use std::rand::random;
@@ -275,3 +284,4 @@ fn ring_distance() {
     })
   });
 }
+*/
