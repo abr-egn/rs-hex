@@ -4,6 +4,10 @@ extern crate hex;
 fn foo() {
   let p = hex::Hex {x: 0, y: 0, z: 0};
   assert_eq!(0, p.x);
+  for d in hex::Direction::all() {
+    let delta = d.delta();
+    assert_eq!(0, delta.dx + delta.dy + delta.dz);
+  }
 }
 
 /*
