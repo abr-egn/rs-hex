@@ -3,3 +3,6 @@
 name = "hex"
 version = "0.0.2"
 authors = ["Abraham Egnor <abe.egnor@gmail.com>"]
+
+[dependencies]
+quickcheck = "0.1.29"

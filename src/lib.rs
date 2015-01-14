@@ -1,9 +1,16 @@
+#[cfg(test)]
+extern crate quickcheck;
+#[cfg(test)] #[allow(unstable)]
+extern crate rand;
+
 use std::ops::{Add,Sub,Mul};
 
-#[derive(PartialEq, Eq, Copy, Clone, Default)]
+#[derive(PartialEq, Eq, Copy, Clone, Default, Show)]
 pub struct Hex { pub x: i32, pub y: i32, pub z: i32 }
-#[derive(PartialEq, Eq, Copy, Clone, Default)]
+#[derive(PartialEq, Eq, Copy, Clone, Default, Show)]
 pub struct Delta { pub dx: i32, pub dy: i32, pub dz: i32 }
+
+pub static ORIGIN: Hex = Hex { x: 0, y: 0, z: 0 };
 
 impl Add<Delta> for Hex {
   type Output = Hex;
@@ -50,10 +57,12 @@ impl Iterator for IterSize {
 }
 
 impl ExactSizeIterator for IterSize {
+  #[allow(unstable)]
   fn len(&self) -> usize { self.i.len() }
 }
 
 impl Hex {
+  #[allow(unstable)]
   pub fn distance_to(&self, other: Hex) -> u32 {
     use std::num::SignedInt;    // for .abs()
 
@@ -65,7 +74,7 @@ impl Hex {
   pub fn line(&self, dir: Direction, dist: u32) -> Iter {
     let h = *self;
     Iter { i: Box::new(
-      std::iter::range_inclusive(1, dist).map(move |d| h + dir.delta()*(d as i32))
+      (1..dist+1).map(move |d| h + dir.delta()*(d as i32))
     ) }
   }
   pub fn neighbors(&self) -> IterSize {
@@ -118,10 +127,43 @@ impl Region {
   pub fn area(&self) -> Iter {
     let copy = *self;
     Iter { i: Box::new(
-      std::iter::range_inclusive(0, copy.radius).flat_map(move |r| {
+      (0..copy.radius+1).flat_map(move |r| {
         let tmp = Region {center: copy.center, radius: r};
         tmp.ring()
       })
     ) }
   }
+}
+
+#[cfg(test)]
+mod tests {
+
+use super::Hex;
+
+use quickcheck;
+use quickcheck::quickcheck;
+use rand::Rng;
+
+impl quickcheck::Arbitrary for Hex {
+  #[allow(unstable)]
+  fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
+    let x = g.gen_range(-1000, 1000);
+    let y = g.gen_range(-1000, 1000);
+    Hex {x: x, y: y, z: 0-(x+y)}
+  }
+  fn shrink(&self) -> Box<quickcheck::Shrinker<Self> + 'static> {
+    let xy = (self.x, self.y).shrink();
+    let out = xy.map(|(x, y)| Hex {x: x, y: y, z: 0-(x+y)});
+    Box::new(out)
+  }
+}
+
+#[test]
+fn six_neighbors() {
+  /*
+  fn prop(h: Hex) -> bool { h.neighbors().count() == 6 }
+  quickcheck(prop);
+  */
+}
+
 }
