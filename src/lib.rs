@@ -160,10 +160,8 @@ impl quickcheck::Arbitrary for Hex {
 
 #[test]
 fn six_neighbors() {
-  /*
   fn prop(h: Hex) -> bool { h.neighbors().count() == 6 }
-  quickcheck(prop);
-  */
+  quickcheck(prop as fn(Hex) -> bool);
 }
 
 }
