@@ -1,13 +1,16 @@
 #[cfg(test)]
 extern crate quickcheck;
-#[cfg(test)] #[allow(unstable)]
+// If this (or the corresponding cargo [dependencies] line) is omitted, test
+// compilation barfs with 'source trait is private' for rand::Rng methods on
+// quickcheck::Gen.
+#[cfg(test)]
 extern crate rand;
 
 use std::ops::{Add,Sub,Mul};
 
-#[derive(PartialEq, Eq, Copy, Clone, Default, Show)]
+#[derive(PartialEq, Eq, Copy, Clone, Default, Debug)]
 pub struct Hex { pub x: i32, pub y: i32, pub z: i32 }
-#[derive(PartialEq, Eq, Copy, Clone, Default, Show)]
+#[derive(PartialEq, Eq, Copy, Clone, Default, Debug)]
 pub struct Delta { pub dx: i32, pub dy: i32, pub dz: i32 }
 
 pub static ORIGIN: Hex = Hex { x: 0, y: 0, z: 0 };
@@ -57,15 +60,11 @@ impl Iterator for IterSize {
 }
 
 impl ExactSizeIterator for IterSize {
-  #[allow(unstable)]
   fn len(&self) -> usize { self.i.len() }
 }
 
 impl Hex {
-  #[allow(unstable)]
   pub fn distance_to(&self, other: Hex) -> u32 {
-    use std::num::SignedInt;    // for .abs()
-
     let Delta {dx, dy, dz} = *self - other;
     let mut values = [dx.abs() as u32, dy.abs() as u32, dz.abs() as u32];
     values.sort();
@@ -142,16 +141,14 @@ use super::Hex;
 
 use quickcheck;
 use quickcheck::quickcheck;
-use rand::Rng;
 
 impl quickcheck::Arbitrary for Hex {
-  #[allow(unstable)]
   fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
     let x = g.gen_range(-1000, 1000);
     let y = g.gen_range(-1000, 1000);
     Hex {x: x, y: y, z: 0-(x+y)}
   }
-  fn shrink(&self) -> Box<quickcheck::Shrinker<Self> + 'static> {
+  fn shrink(&self) -> Box<Iterator<Item=Hex> + 'static> {
     let xy = (self.x, self.y).shrink();
     let out = xy.map(|(x, y)| Hex {x: x, y: y, z: 0-(x+y)});
     Box::new(out)

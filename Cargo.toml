@@ -1,8 +1,9 @@
 [package]
 
 name = "hex"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Abraham Egnor <abe.egnor@gmail.com>"]
 
 [dependencies]
-quickcheck = "0.1.29"
+quickcheck = "0.2.11"
+rand = "*"
