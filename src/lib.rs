@@ -8,9 +8,9 @@ extern crate rand;
 
 use std::ops::{Add,Sub,Mul};
 
-#[derive(PartialEq, Eq, Copy, Clone, Default, Debug)]
+#[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash)]
 pub struct Hex { pub x: i32, pub y: i32, pub z: i32 }
-#[derive(PartialEq, Eq, Copy, Clone, Default, Debug)]
+#[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash)]
 pub struct Delta { pub dx: i32, pub dy: i32, pub dz: i32 }
 
 pub static ORIGIN: Hex = Hex { x: 0, y: 0, z: 0 };
@@ -84,7 +84,7 @@ impl Hex {
   }
 }
 
-#[derive(PartialEq, Eq, Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone, Hash)]
 pub enum Direction { XY, XZ, YZ, YX, ZX, ZY }
 
 impl Direction {
@@ -104,7 +104,7 @@ impl Direction {
 
 static DIRECTIONS: [Direction; 6] = [Direction::XY, Direction::XZ, Direction::YZ, Direction::YX, Direction::ZX, Direction::ZY];
 
-#[derive(PartialEq, Eq, Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone, Hash)]
 pub struct Region { center: Hex, radius: u32 }
 
 static RING_SIDES: [(Direction, Direction); 6] =
@@ -138,6 +138,9 @@ impl Region {
 mod tests {
 
 use super::Hex;
+use super::Direction;
+
+use std::collections::HashSet;
 
 use quickcheck;
 use quickcheck::quickcheck;
@@ -155,10 +158,68 @@ impl quickcheck::Arbitrary for Hex {
   }
 }
 
+// Every hex has six neighbors.
 #[test]
 fn six_neighbors() {
   fn prop(h: Hex) -> bool { h.neighbors().count() == 6 }
   quickcheck(prop as fn(Hex) -> bool);
 }
+
+// The neighbors of the neighbors of every hex include the original hex.
+#[test]
+fn transitive_neighbors() {
+  fn prop(h: Hex) -> bool {
+    h.neighbors().all(|n| n.neighbors().any(|nn| nn == h))
+  }
+  quickcheck(prop as fn(Hex) -> bool);
+}
+
+// The neighbors of the neighbors of every hex have two hexes in common with
+// the original set of neighbors.
+#[test]
+fn overlap_neighbors() {
+  fn prop(h: Hex) -> bool {
+    let ns: HashSet<Hex> = h.neighbors().collect();
+    ns.iter().all(|n| {
+      let nns: HashSet<Hex> = n.neighbors().collect();
+      ns.intersection(&nns).count() == 2
+    })
+  }
+  quickcheck(prop as fn(Hex) -> bool);
+}
+
+// The distance from a hex to its neighbors is 1.
+#[test]
+fn neighbor_distance() {
+  fn prop(h: Hex) -> bool { h.neighbors().all(|n| h.distance_to(n) == 1) }
+  quickcheck(prop as fn(Hex) -> bool);
+}
+
+impl quickcheck::Arbitrary for Direction {
+  // Should be able to derive(Rand) for Direction and just do { g.gen() } for
+  // this, but derive(Rand) is deprecated in favor of a derive_rand macro in
+  // an external crate (wtf?).
+  fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
+    let n = g.gen_range(0, 6);
+    Direction::all().nth(n).unwrap().clone()
+  }
+}
+
+#[derive(Clone)]
+struct SmallPositiveInt(u32);
+
+impl quickcheck::Arbitrary for SmallPositiveInt {
+  fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
+    SmallPositiveInt(g.gen_range(1, 1000))
+  }
+  fn shrink(&self) -> Box<Iterator<Item=SmallPositiveInt> + 'static> {
+    match *self {
+      SmallPositiveInt(1) => quickcheck::empty_shrinker(),
+      SmallPositiveInt(n) => quickcheck::single_shrinker(SmallPositiveInt(n/2))
+    }
+  }
+}
+
+// TODO: continue porting from tests/lib.rs at line_length
 
 }
