@@ -217,6 +217,12 @@ impl quickcheck::Arbitrary for SmallPositiveInt {
   }
 }
 
+#[test]
+fn line_length() {
+  fn prop(p: (Hex, Direction, SmallPositiveInt)) -> bool { true }
+  quickcheck(prop as fn((Hex, Direction, SmallPositiveInt)) -> bool);
+}
+
 // TODO: continue porting from tests/lib.rs at line_length
 
 }  // mod tests
