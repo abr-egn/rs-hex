@@ -1,11 +1,3 @@
-#[cfg(test)]
-extern crate quickcheck;
-// If this (or the corresponding cargo [dependencies] line) is omitted, test
-// compilation barfs with 'source trait is private' for rand::Rng methods on
-// quickcheck::Gen.
-#[cfg(test)]
-extern crate rand;
-
 use std::ops::{Add,Sub,Mul};
 
 #[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash)]
@@ -137,13 +129,18 @@ impl Region {
 #[cfg(test)]
 mod tests {
 
+extern crate quickcheck;
+// If this (or the corresponding cargo [dependencies] line) is omitted, test
+// compilation barfs with 'source trait is private' for rand::Rng methods on
+// quickcheck::Gen.
+extern crate rand;
+
 use super::Hex;
 use super::Direction;
 
 use std::collections::HashSet;
 
-use quickcheck;
-use quickcheck::quickcheck;
+use self::quickcheck::quickcheck;
 
 impl quickcheck::Arbitrary for Hex {
   fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
@@ -222,4 +219,4 @@ impl quickcheck::Arbitrary for SmallPositiveInt {
 
 // TODO: continue porting from tests/lib.rs at line_length
 
-}
+}  // mod tests
