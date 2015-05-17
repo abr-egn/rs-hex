@@ -62,9 +62,9 @@ impl Hex {
     values.sort();
     values[0]+values[1]
   }
-  pub fn line(&self, dir: Direction, dist: u32) -> Iter {
+  pub fn line(&self, dir: Direction, dist: u32) -> IterSize {
     let h = *self;
-    Iter { i: Box::new(
+    IterSize { i: Box::new(
       (1..dist+1).map(move |d| h + dir.delta()*(d as i32))
     ) }
   }
@@ -76,7 +76,7 @@ impl Hex {
   }
 }
 
-#[derive(PartialEq, Eq, Copy, Clone, Hash)]
+#[derive(PartialEq, Eq, Copy, Clone, Hash, Debug)]
 pub enum Direction { XY, XZ, YZ, YX, ZX, ZY }
 
 impl Direction {
@@ -202,7 +202,7 @@ impl quickcheck::Arbitrary for Direction {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct SmallPositiveInt(u32);
 
 impl quickcheck::Arbitrary for SmallPositiveInt {
@@ -219,10 +219,13 @@ impl quickcheck::Arbitrary for SmallPositiveInt {
 
 #[test]
 fn line_length() {
-  fn prop(p: (Hex, Direction, SmallPositiveInt)) -> bool { true }
+  fn prop(p: (Hex, Direction, SmallPositiveInt)) -> bool {
+    let (h, d, SmallPositiveInt(i)) = p;
+    h.line(d, i).len() == (i as usize)
+  }
   quickcheck(prop as fn((Hex, Direction, SmallPositiveInt)) -> bool);
 }
 
-// TODO: continue porting from tests/lib.rs at line_length
+// TODO: continue porting from tests/lib.rs at line_delta
 
 }  // mod tests
