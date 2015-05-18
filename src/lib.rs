@@ -33,32 +33,18 @@ impl Mul<i32> for Delta {
   }
 }
 
-pub struct Iter {
-  i: Box<Iterator<Item=Hex> + 'static>
-}
-
-impl Iterator for Iter {
-  type Item = Hex;
-  fn next(&mut self) -> Option<Hex> { self.i.next() }
-  fn size_hint(&self) -> (usize, Option<usize>) { self.i.size_hint() }
-}
-
-pub struct IterSize {
-  i: Box<ExactSizeIterator<Item=Hex> + 'static>
-}
-
-impl Iterator for IterSize {
-  type Item = Hex;
-  fn next(&mut self) -> Option<Hex> { self.i.next() }
-  fn size_hint(&self) -> (usize, Option<usize>) { self.i.size_hint() }
-}
-
-impl ExactSizeIterator for IterSize {
-  fn len(&self) -> usize { self.i.len() }
-}
+pub type Iter = Box<Iterator<Item=Hex> + 'static>;
+pub type IterSize = Box<ExactSizeIterator<Item=Hex> + 'static>;
 
 impl Hex {
   /// Returns the "shortest path" distance to `other`.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use hex::{Hex, ORIGIN};
+  /// assert_eq!(ORIGIN.distance_to(Hex {x:1,y:1,z:-2}), 2);
+  /// ```
   pub fn distance_to(&self, other: Hex) -> u32 {
     let Delta {dx, dy, dz} = *self - other;
     let mut values = [dx.abs() as u32, dy.abs() as u32, dz.abs() as u32];
@@ -66,18 +52,32 @@ impl Hex {
     values[0]+values[1]
   }
   /// A straight line of `dist` hexes, not including this one.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use hex::{Hex, Direction, ORIGIN};
+  /// assert_eq!(ORIGIN.line(Direction::XY, 5).last().unwrap(), Hex {x:5,y:-5,z:0});
+  /// ```
   pub fn line(&self, dir: Direction, dist: u32) -> IterSize {
     let h = *self;
-    IterSize { i: Box::new(
+    Box::new(
       (1..dist+1).map(move |d| h + dir.delta()*(d as i32))
-    ) }
+    )
   }
   /// The six neighbor coordinates.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use hex::{Hex, ORIGIN};
+  /// assert!(ORIGIN.neighbors().all(|h| ORIGIN.distance_to(h) == 1));
+  /// ```
   pub fn neighbors(&self) -> IterSize {
     let h = *self;
-    IterSize { i: Box::new(
+    Box::new(
       Direction::all().map(move |d| h + d.delta())
-    ) }
+    )
   }
 }
 
@@ -124,19 +124,19 @@ impl Region {
   /// The outer ring of `Hex`es of this region.
   pub fn ring(&self) -> Iter {
     let copy = *self;
-    Iter { i: Box::new(
+    Box::new(
       RING_SIDES.iter().flat_map(move |&(start, dir)| (copy.center + start.delta()*(copy.radius as i32)).line(dir, copy.radius))
-    ) }
+    )
   }
   /// All `Hex`es contained in this region.
   pub fn area(&self) -> Iter {
     let copy = *self;
-    Iter { i: Box::new(
+    Box::new(
       (0..copy.radius+1).flat_map(move |r| {
         let tmp = Region {center: copy.center, radius: r};
         tmp.ring()
       })
-    ) }
+    )
   }
 }
 
