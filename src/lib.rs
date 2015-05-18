@@ -1,7 +1,9 @@
 use std::ops::{Add,Sub,Mul};
 
+/// A hex-grid coordinate, using cubic notation.
 #[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash)]
 pub struct Hex { pub x: i32, pub y: i32, pub z: i32 }
+/// The difference between two `Hex` coordinates.
 #[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash)]
 pub struct Delta { pub dx: i32, pub dy: i32, pub dz: i32 }
 
@@ -56,18 +58,21 @@ impl ExactSizeIterator for IterSize {
 }
 
 impl Hex {
+  /// Returns the "shortest path" distance to `other`.
   pub fn distance_to(&self, other: Hex) -> u32 {
     let Delta {dx, dy, dz} = *self - other;
     let mut values = [dx.abs() as u32, dy.abs() as u32, dz.abs() as u32];
     values.sort();
     values[0]+values[1]
   }
+  /// A straight line of `dist` hexes, not including this one.
   pub fn line(&self, dir: Direction, dist: u32) -> IterSize {
     let h = *self;
     IterSize { i: Box::new(
       (1..dist+1).map(move |d| h + dir.delta()*(d as i32))
     ) }
   }
+  /// The six neighbor coordinates.
   pub fn neighbors(&self) -> IterSize {
     let h = *self;
     IterSize { i: Box::new(
@@ -76,12 +81,15 @@ impl Hex {
   }
 }
 
+/// The six cardinal directions of movement, named as `<increment coordinate><decrement coordinate>`.
 #[derive(PartialEq, Eq, Copy, Clone, Hash, Debug)]
 pub enum Direction { XY, XZ, YZ, YX, ZX, ZY }
 
 impl Direction {
   // TODO: implement all() in terms of Range / Step?
+  /// All `Direction`s, in convenient `Iterator` format.
   pub fn all() -> std::slice::Iter<'static, Direction> { DIRECTIONS.iter() }
+  /// Returns the `Delta` corresponding to a single move in this `Direction`.
   pub fn delta(self) -> Delta {
     match self {
       Direction::XY => Delta {dx: 1, dy:-1, dz: 0},
@@ -96,6 +104,9 @@ impl Direction {
 
 static DIRECTIONS: [Direction; 6] = [Direction::XY, Direction::XZ, Direction::YZ, Direction::YX, Direction::ZX, Direction::ZY];
 
+/// A hexagonal region of given center and radius.
+///
+/// A zero-radius region is a single hex.
 #[derive(PartialEq, Eq, Copy, Clone, Hash)]
 pub struct Region { center: Hex, radius: u32 }
 
@@ -108,13 +119,16 @@ static RING_SIDES: [(Direction, Direction); 6] =
    (Direction::ZY, Direction::XZ)];
 
 impl Region {
+  /// Whether the given `Hex` is contained in this region.
   pub fn contains(&self, h: Hex) -> bool { self.center.distance_to(h) <= self.radius }
+  /// The outer ring of `Hex`es of this region.
   pub fn ring(&self) -> Iter {
     let copy = *self;
     Iter { i: Box::new(
       RING_SIDES.iter().flat_map(move |&(start, dir)| (copy.center + start.delta()*(copy.radius as i32)).line(dir, copy.radius))
     ) }
   }
+  /// All `Hex`es contained in this region.
   pub fn area(&self) -> Iter {
     let copy = *self;
     Iter { i: Box::new(
