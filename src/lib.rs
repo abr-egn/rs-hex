@@ -240,6 +240,20 @@ fn line_length() {
   quickcheck(prop as fn((Hex, Direction, SmallPositiveInt)) -> bool);
 }
 
-// TODO: continue porting from tests/lib.rs at line_delta
+#[test]
+fn line_delta() {
+  fn prop(p: (Hex, Direction, SmallPositiveInt)) -> bool {
+    let (h, d, SmallPositiveInt(i)) = p;
+    let mut prev = h;
+    h.line(d, i).all(|pt| {
+      let cmp = (pt - prev) == d.delta();
+      prev = pt;
+      cmp
+    })
+  }
+  quickcheck(prop as fn((Hex, Direction, SmallPositiveInt)) -> bool);
+}
+
+// TODO: continue porting from tests/lib.rs at SmallNonNegativeInt
 
 }  // mod tests
