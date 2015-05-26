@@ -138,8 +138,8 @@ impl Region {
   ///
   /// ```
   /// use hex::{Region, ORIGIN};
-  /// assert!(Region{center:ORIGIN,radius:0}.ring().count() == 1);
-  /// assert!(Region{center:ORIGIN,radius:1}.ring().count() == 6);
+  /// assert_eq!(Region{center:ORIGIN,radius:0}.ring().count(), 1);
+  /// assert_eq!(Region{center:ORIGIN,radius:1}.ring().count(), 6);
   /// ```
   pub fn ring(&self) -> Iter {
     let copy = *self;
