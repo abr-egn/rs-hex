@@ -107,7 +107,7 @@ static DIRECTIONS: [Direction; 6] = [Direction::XY, Direction::XZ, Direction::YZ
 /// A hexagonal region of given center and radius.
 ///
 /// A zero-radius region is a single hex.
-#[derive(PartialEq, Eq, Copy, Clone, Hash)]
+#[derive(PartialEq, Eq, Copy, Clone, Hash, Debug)]
 pub struct Region { center: Hex, radius: u32 }
 
 static RING_SIDES: [(Direction, Direction); 6] =
@@ -151,6 +151,7 @@ extern crate rand;
 
 use super::Hex;
 use super::Direction;
+use super::Region;
 
 use std::collections::HashSet;
 
@@ -254,6 +255,40 @@ fn line_delta() {
   quickcheck(prop as fn((Hex, Direction, SmallPositiveInt)) -> bool);
 }
 
-// TODO: continue porting from tests/lib.rs at SmallNonNegativeInt
+#[derive(Clone, Debug)]
+struct SmallNonNegativeInt(u32);
+
+impl quickcheck::Arbitrary for SmallNonNegativeInt {
+  fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
+    SmallNonNegativeInt(g.gen_range(0, 1000))
+  }
+  fn shrink(&self) -> Box<Iterator<Item=SmallNonNegativeInt> + 'static> {
+    match *self {
+      SmallNonNegativeInt(0) => quickcheck::empty_shrinker(),
+      SmallNonNegativeInt(1) => quickcheck::single_shrinker(SmallNonNegativeInt(0)),
+      SmallNonNegativeInt(n) => quickcheck::single_shrinker(SmallNonNegativeInt(n/2)),
+    }
+  }
+}
+
+impl quickcheck::Arbitrary for Region {
+  fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
+    let center: Hex = quickcheck::Arbitrary::arbitrary(g);
+    let SmallNonNegativeInt(radius)  = quickcheck::Arbitrary::arbitrary(g);
+    Region { center: center, radius: radius }
+  }
+  fn shrink(&self) -> Box<Iterator<Item=Region> + 'static> {
+    Box::new(self.center.shrink().zip(SmallNonNegativeInt(self.radius).shrink()).map(
+      |(c, SmallNonNegativeInt(r))| { Region { center: c, radius: r} }))
+  }
+}
+
+#[test]
+fn contains_center() {
+  fn prop(p: Region) -> bool { p.contains(p.center) }
+  quickcheck(prop as fn(Region) -> bool);
+}
+
+// TODO: continue porting from tests/lib.rs at contains_other
 
 }  // mod tests
