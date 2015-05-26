@@ -298,6 +298,18 @@ fn contains_other() {
   quickcheck(prop as fn(Hex, Hex) -> bool);
 }
 
-// TODO: continue porting from tests/lib.rs at contains_other
+#[test]
+fn ring_len() {
+  fn expected(r: u32) -> usize {
+    match r {
+      0 => 1,
+      x => (x as usize)*6,
+    }
+  }
+  fn prop(r: Region) -> bool { r.ring().count() == expected(r.radius) }
+  quickcheck(prop as fn(Region) -> bool);
+}
+
+// TODO: continue porting from tests/lib.rs at ring_distance
 
 }  // mod tests
