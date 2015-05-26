@@ -2,26 +2,37 @@ use std::ops::{Add,Sub,Mul};
 
 /// A hex-grid coordinate, using cubic notation.
 #[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash)]
-pub struct Hex { pub x: i32, pub y: i32, pub z: i32 }
+pub struct Hex { pub x: i32, pub y: i32 }
+impl Hex {
+  pub fn x(&self) -> i32 { self.x }
+  pub fn y(&self) -> i32 { self.y }
+  pub fn z(&self) -> i32 { 0 - (self.x + self.y) }
+}
+
 /// The difference between two `Hex` coordinates.
 #[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash)]
-pub struct Delta { pub dx: i32, pub dy: i32, pub dz: i32 }
+pub struct Delta { pub dx: i32, pub dy: i32 }
+impl Delta {
+  pub fn dx(&self) -> i32 { self.dx }
+  pub fn dy(&self) -> i32 { self.dy }
+  pub fn dz(&self) -> i32 { 0 - (self.dx + self.dy) }
+}
 
-pub static ORIGIN: Hex = Hex { x: 0, y: 0, z: 0 };
+pub static ORIGIN: Hex = Hex {x: 0, y: 0};
 
 impl Add<Delta> for Hex {
   type Output = Hex;
 
-  fn add(self, Delta {dx, dy, dz}: Delta) -> Hex {
-    Hex {x: self.x+dx, y: self.y+dy, z: self.z+dz}
+  fn add(self, Delta {dx, dy}: Delta) -> Hex {
+    Hex {x: self.x+dx, y: self.y+dy}
   }
 }
 
 impl Sub for Hex {
   type Output = Delta; 
 
-  fn sub(self, Hex {x, y, z}: Hex) -> Delta {
-    Delta {dx: self.x-x, dy: self.y-y, dz: self.z-z}
+  fn sub(self, Hex {x, y}: Hex) -> Delta {
+    Delta {dx: self.x-x, dy: self.y-y}
   }
 }
 
@@ -29,7 +40,7 @@ impl Mul<i32> for Delta {
   type Output = Delta;
 
   fn mul(self, f: i32) -> Delta {
-    Delta {dx: self.dx*f, dy: self.dy*f, dz: self.dz*f}
+    Delta {dx: self.dx*f, dy: self.dy*f}
   }
 }
 
@@ -43,11 +54,11 @@ impl Hex {
   ///
   /// ```
   /// use hex::{Hex, ORIGIN};
-  /// assert_eq!(ORIGIN.distance_to(Hex {x:1,y:1,z:-2}), 2);
+  /// assert_eq!(ORIGIN.distance_to(Hex {x:1,y:1}), 2);
   /// ```
   pub fn distance_to(&self, other: Hex) -> u32 {
-    let Delta {dx, dy, dz} = *self - other;
-    let mut values = [dx.abs() as u32, dy.abs() as u32, dz.abs() as u32];
+    let d = *self - other;
+    let mut values = [d.dx().abs() as u32, d.dy().abs() as u32, d.dz().abs() as u32];
     values.sort();
     values[0]+values[1]
   }
@@ -57,7 +68,7 @@ impl Hex {
   ///
   /// ```
   /// use hex::{Hex, Direction, ORIGIN};
-  /// assert_eq!(ORIGIN.line(Direction::XY, 5).last().unwrap(), Hex {x:5,y:-5,z:0});
+  /// assert_eq!(ORIGIN.line(Direction::XY, 5).last().unwrap(), Hex {x:5,y:-5});
   /// ```
   pub fn line(&self, dir: Direction, dist: u32) -> IterSize {
     let h = *self;
@@ -92,12 +103,12 @@ impl Direction {
   /// Returns the `Delta` corresponding to a single move in this `Direction`.
   pub fn delta(self) -> Delta {
     match self {
-      Direction::XY => Delta {dx: 1, dy:-1, dz: 0},
-      Direction::XZ => Delta {dx: 1, dy: 0, dz:-1},
-      Direction::YZ => Delta {dx: 0, dy: 1, dz:-1},
-      Direction::YX => Delta {dx:-1, dy: 1, dz: 0},
-      Direction::ZX => Delta {dx:-1, dy: 0, dz: 1},
-      Direction::ZY => Delta {dx: 0, dy:-1, dz: 1}
+      Direction::XY => Delta {dx: 1, dy:-1},
+      Direction::XZ => Delta {dx: 1, dy: 0},
+      Direction::YZ => Delta {dx: 0, dy: 1},
+      Direction::YX => Delta {dx:-1, dy: 1},
+      Direction::ZX => Delta {dx:-1, dy: 0},
+      Direction::ZY => Delta {dx: 0, dy:-1},
     }
   }
 }
@@ -170,11 +181,11 @@ impl quickcheck::Arbitrary for Hex {
   fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
     let x = g.gen_range(-1000, 1000);
     let y = g.gen_range(-1000, 1000);
-    Hex {x: x, y: y, z: 0-(x+y)}
+    Hex {x: x, y: y}
   }
   fn shrink(&self) -> Box<Iterator<Item=Hex> + 'static> {
     let xy = (self.x, self.y).shrink();
-    let out = xy.map(|(x, y)| Hex {x: x, y: y, z: 0-(x+y)});
+    let out = xy.map(|(x, y)| Hex {x: x, y: y});
     Box::new(out)
   }
 }
