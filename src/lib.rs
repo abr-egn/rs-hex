@@ -144,8 +144,7 @@ impl Region {
   pub fn ring(&self) -> Iter {
     let copy = *self;
     if self.radius == 0 {
-      // TODO: better idiom for singleton iterator
-      return Box::new((0..1).map(move |_| copy.center));
+      return Box::new(Some(copy.center).into_iter());
     }
     Box::new(
       RING_SIDES.iter().flat_map(move |&(start, dir)| (copy.center + start.delta()*(copy.radius as i32)).line(dir, copy.radius))
