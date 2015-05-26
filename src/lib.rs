@@ -108,7 +108,7 @@ static DIRECTIONS: [Direction; 6] = [Direction::XY, Direction::XZ, Direction::YZ
 ///
 /// A zero-radius region is a single hex.
 #[derive(PartialEq, Eq, Copy, Clone, Hash, Debug)]
-pub struct Region { center: Hex, radius: u32 }
+pub struct Region { pub center: Hex, pub radius: u32 }
 
 static RING_SIDES: [(Direction, Direction); 6] =
   [(Direction::XY, Direction::YZ),
@@ -122,8 +122,20 @@ impl Region {
   /// Whether the given `Hex` is contained in this region.
   pub fn contains(&self, h: Hex) -> bool { self.center.distance_to(h) <= self.radius }
   /// The outer ring of `Hex`es of this region.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use hex::{Region, ORIGIN};
+  /// assert!(Region{center:ORIGIN,radius:0}.ring().count() == 1);
+  /// assert!(Region{center:ORIGIN,radius:1}.ring().count() == 6);
+  /// ```
   pub fn ring(&self) -> Iter {
     let copy = *self;
+    if self.radius == 0 {
+      // TODO: better idiom for singleton iterator
+      return Box::new((0..1).map(move |_| copy.center));
+    }
     Box::new(
       RING_SIDES.iter().flat_map(move |&(start, dir)| (copy.center + start.delta()*(copy.radius as i32)).line(dir, copy.radius))
     )
