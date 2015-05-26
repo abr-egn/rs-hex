@@ -289,6 +289,15 @@ fn contains_center() {
   quickcheck(prop as fn(Region) -> bool);
 }
 
+#[test]
+fn contains_other() {
+  fn prop(p1: Hex, p2: Hex) -> bool {
+    let r = Region { center: p1, radius: p1.distance_to(p2) };
+    r.contains(p2)
+  }
+  quickcheck(prop as fn(Hex, Hex) -> bool);
+}
+
 // TODO: continue porting from tests/lib.rs at contains_other
 
 }  // mod tests
