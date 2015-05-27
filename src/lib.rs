@@ -42,20 +42,6 @@ impl Hex {
   pub fn x(&self) -> i32 { self.x }
   pub fn y(&self) -> i32 { self.y }
   pub fn z(&self) -> i32 { 0 - (self.x + self.y) }
-  /// The smallest number of single-hex translations to get to `other`.
-  ///
-  /// # Examples
-  ///
-  /// ```
-  /// use hex::{Hex, ORIGIN};
-  /// assert_eq!(ORIGIN.moves_to(Hex {x:1,y:1}), 2);
-  /// ```
-  pub fn moves_to(&self, other: Hex) -> i32 {
-    let d = *self - other;
-    let mut values = [d.dx().abs(), d.dy().abs(), d.dz().abs()];
-    values.sort();
-    values[0]+values[1]
-  }
   /// The distance to the other hex as a straight-line path.
   ///
   /// # Examples
@@ -88,7 +74,7 @@ impl Hex {
   ///
   /// ```
   /// use hex::{Hex, ORIGIN};
-  /// assert!(ORIGIN.neighbors().all(|h| ORIGIN.moves_to(h) == 1));
+  /// assert!(ORIGIN.neighbors().all(|h| ORIGIN.distance_to(h) == 1));
   /// ```
   pub fn neighbors(&self) -> IterSize {
     let h = *self;
@@ -250,15 +236,8 @@ fn overlap_neighbors() {
 // The number of moves from a hex to its neighbors is 1.
 #[test]
 fn neighbor_moves() {
-  fn prop(h: Hex) -> bool { h.neighbors().all(|n| h.moves_to(n) == 1) }
+  fn prop(h: Hex) -> bool { h.neighbors().all(|n| h.distance_to(n) == 1) }
   quickcheck(prop as fn(Hex) -> bool);
-}
-
-// Number of moves between hexes is <= the line distance.
-#[test]
-fn move_distance() {
-  fn prop(h1: Hex, h2: Hex) -> bool { h1.moves_to(h2) <= h1.distance_to(h2) }
-  quickcheck(prop as fn(Hex, Hex) -> bool);
 }
 
 impl quickcheck::Arbitrary for Direction {
@@ -349,7 +328,7 @@ fn ring_len() {
 #[test]
 fn ring_moves() {
   fn prop(r: SmallNonNegativeInt) -> bool {
-    hex_ring(*r).all(|h| { ORIGIN.moves_to(h) == *r })
+    hex_ring(*r).all(|h| { ORIGIN.distance_to(h) == *r })
   }
   quickcheck(prop as fn(SmallNonNegativeInt) -> bool);
 }
