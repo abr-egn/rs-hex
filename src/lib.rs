@@ -4,20 +4,10 @@ use std::ops::{Add,Sub,Mul};
 /// A hex-grid coordinate, using cubic notation.
 #[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash)]
 pub struct Hex { pub x: i32, pub y: i32 }
-impl Hex {
-  pub fn x(&self) -> i32 { self.x }
-  pub fn y(&self) -> i32 { self.y }
-  pub fn z(&self) -> i32 { 0 - (self.x + self.y) }
-}
 
 /// The difference between two `Hex` coordinates.
 #[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash)]
 pub struct Delta { pub dx: i32, pub dy: i32 }
-impl Delta {
-  pub fn dx(&self) -> i32 { self.dx }
-  pub fn dy(&self) -> i32 { self.dy }
-  pub fn dz(&self) -> i32 { 0 - (self.dx + self.dy) }
-}
 
 pub static ORIGIN: Hex = Hex {x: 0, y: 0};
 
@@ -49,6 +39,9 @@ pub type Iter = Box<Iterator<Item=Hex> + 'static>;
 pub type IterSize = Box<ExactSizeIterator<Item=Hex> + 'static>;
 
 impl Hex {
+  pub fn x(&self) -> i32 { self.x }
+  pub fn y(&self) -> i32 { self.y }
+  pub fn z(&self) -> i32 { 0 - (self.x + self.y) }
   /// Returns the smallest number of single-hex translations to get to `other`.
   ///
   /// # Examples
@@ -91,6 +84,22 @@ impl Hex {
       Direction::all().map(move |d| h + d.delta())
     )
   }
+}
+
+impl Delta {
+  pub fn dx(&self) -> i32 { self.dx }
+  pub fn dy(&self) -> i32 { self.dy }
+  pub fn dz(&self) -> i32 { 0 - (self.dx + self.dy) }
+  /// The length of this translation, i.e. the number of hexes a line of this length would have.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use hex::{Delta};
+  /// assert_eq!(Delta{dx:0,dy:0}.length(), 0);
+  /// assert_eq!(Delta{dx:1,dy:2}.length(), 4);
+  /// ```
+  pub fn length(&self) -> i32 { (self.dx().abs() + self.dy().abs() + self.dz().abs() / 2) as i32 }
 }
 
 /// The six cardinal directions of movement, named as `<increment coordinate><decrement coordinate>`.
@@ -266,7 +275,7 @@ impl quickcheck::Arbitrary for SmallPositiveInt {
   }
 }
 
-// The difference between subsequent hexes in an axus is the directional delta.
+// The difference between subsequent hexes in an axis is the directional delta.
 #[test]
 fn line_delta() {
   fn prop((h, d, i): (Hex, Direction, SmallPositiveInt)) -> bool {
