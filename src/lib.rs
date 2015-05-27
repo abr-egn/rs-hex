@@ -82,6 +82,21 @@ impl Hex {
       Direction::all().map(move |d| h + d.delta())
     )
   }
+  /// A straight line to the target hex.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use hex::{Hex, ORIGIN};
+  /// let h = Hex{x:1,y:2};
+  /// assert_eq!(ORIGIN.line_to(h).last().unwrap(), h);
+  /// ```
+  pub fn line_to(&self, other: Hex) -> Iter {
+    let copy = *self;
+    let n = copy.distance_to(other);
+    let step = 1.0 / cmp::max(n, 1) as f32;
+    Box::new((0..n+1).map(move |i| hex_lerp(copy, other, step*(i as f32)).round()))
+  }
 }
 
 impl Delta {
@@ -177,6 +192,36 @@ pub fn hex_ring(radius: i32) -> Iter {
   )
 }
 
+struct FHex { x: f32, y: f32, z: f32 }
+
+impl FHex {
+  fn round(&self) -> Hex {
+    let mut x = self.x.round() as i32;
+    let mut y = self.y.round() as i32;
+    let z = self.z.round() as i32;
+    let x_diff = (x as f32 - self.x).abs();
+    let y_diff = (y as f32 - self.y).abs();
+    let z_diff = (z as f32 - self.z).abs();
+    if x_diff > y_diff && x_diff > z_diff {
+      x = -y - z;
+    } else if y_diff > z_diff {
+      y = -x - z;
+    } else {
+      // z is unused for the result
+      // z = -x - y;
+    }
+    Hex {x: x, y: y}
+  }
+}
+
+fn hex_lerp(a: Hex, b: Hex, t: f32) -> FHex {
+  FHex {
+    x: (a.x() as f32) + ((b.x() - a.x()) as f32)*t,
+    y: (a.y() as f32) + ((b.y() - a.y()) as f32)*t,
+    z: (a.z() as f32) + ((b.z() - a.z()) as f32)*t,
+  }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -186,6 +231,7 @@ extern crate rand;
 use super::{Hex, Direction, hex_ring, ORIGIN};
 
 use std::collections::HashSet;
+use std::collections::HashMap;
 use std::ops::Deref;
 
 use self::quickcheck::quickcheck;
@@ -238,6 +284,57 @@ fn overlap_neighbors() {
 fn neighbor_distance() {
   fn prop(h: Hex) -> bool { h.neighbors().all(|n| h.distance_to(n) == 1) }
   quickcheck(prop as fn(Hex) -> bool);
+}
+
+// Last hex in a line is the target hex.
+#[test]
+fn line_end() {
+  fn prop(h1: Hex, h2: Hex) -> bool { h1.line_to(h2).last().unwrap() == h2 }
+  quickcheck(prop as fn(Hex, Hex) -> bool);
+}
+
+// The distance between sequential hexes in a line is 1.
+#[test]
+fn line_dist() {
+  fn prop(h1: Hex, h2: Hex) -> bool {
+    let mut prev = h1;
+    h1.line_to(h2).skip(1).all(|h| {
+      let r = (h - prev).length() == 1;
+      prev = h;
+      r
+    })
+  }
+  quickcheck(prop as fn(Hex, Hex) -> bool);
+}
+
+#[derive(PartialEq, Eq, Copy, Clone, Hash, Debug)]
+enum Axis { X, Y, Z }
+
+// At least one axis is consistently incremented/decremented on each line step.
+#[test]
+fn line_steps() {
+  fn prop(h1: Hex, h2: Hex) -> bool {
+    let mut updates = HashMap::new();
+    {
+      let mut update = |a: Axis, d: i32| {
+        if !updates.contains_key(&a) {
+          updates.insert(a, d);
+        } else if *updates.get(&a).unwrap() != d {
+          updates.remove(&a);
+        }
+      };
+      let mut prev = h1;
+      for h in h1.line_to(h2).skip(1) {
+        let d = h - prev;
+        prev = h;
+        update(Axis::X, d.dx());
+        update(Axis::Y, d.dy());
+        update(Axis::Z, d.dz());
+      }
+    }
+    !updates.is_empty()
+  }
+  quickcheck(prop as fn(Hex, Hex) -> bool);
 }
 
 impl quickcheck::Arbitrary for Direction {
