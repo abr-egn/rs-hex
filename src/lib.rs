@@ -1,3 +1,4 @@
+use std::cmp;
 use std::ops::{Add,Sub,Mul};
 
 /// A hex-grid coordinate, using cubic notation.
@@ -115,11 +116,26 @@ impl Direction {
 
 static DIRECTIONS: [Direction; 6] = [Direction::XY, Direction::XZ, Direction::YZ, Direction::YX, Direction::ZX, Direction::ZY];
 
-/// A hexagonal region of given center and radius.
+/// A hexagonal area of cells of given radius centered on the origin.
 ///
-/// A zero-radius region is a single hex.
-#[derive(PartialEq, Eq, Copy, Clone, Hash, Debug)]
-pub struct Region { pub center: Hex, pub radius: u32 }
+/// A zero-radius area is a single hex.
+///
+/// # Examples
+///
+/// ```
+/// use hex::hex_area;
+/// assert_eq!(hex_area(0).count(), 1);
+/// assert_eq!(hex_area(1).count(), 7);
+/// ```
+pub fn hex_area(radius: i32) -> Iter {
+  Box::new(
+    (-radius..radius+1).flat_map(move |q| {
+      let r1 = cmp::max(-radius, -q - radius);
+      let r2 = cmp::min(radius, -q + radius);
+      (r1..r2+1).map(move |r| Hex{x:q, y:r})
+    })
+  )
+}
 
 static RING_SIDES: [(Direction, Direction); 6] =
   [(Direction::XY, Direction::YZ),
@@ -129,42 +145,29 @@ static RING_SIDES: [(Direction, Direction); 6] =
    (Direction::ZX, Direction::XY),
    (Direction::ZY, Direction::XZ)];
 
-impl Region {
-  /// Whether the given `Hex` is contained in this region.
-  pub fn contains(&self, h: Hex) -> bool { self.center.moves_to(h) <= self.radius }
-  /// The outer ring of `Hex`es of this region.
-  ///
-  /// # Examples
-  ///
-  /// ```
-  /// use hex::{Region, ORIGIN};
-  /// assert_eq!(Region{center:ORIGIN,radius:0}.ring().count(), 1);
-  /// assert_eq!(Region{center:ORIGIN,radius:1}.ring().count(), 6);
-  /// ```
-  pub fn ring(&self) -> Iter {
-    let copy = *self;
-    if self.radius == 0 {
-      return Box::new(Some(copy.center).into_iter());
-    }
-    Box::new(
-      RING_SIDES.iter()
-        .flat_map(move |&(start, dir)|
-          (copy.center + start.delta()*(copy.radius as i32))
-            .axis(dir)
-            .skip(1)
-            .take(copy.radius as usize))
-    )
+/// A hexagonal ring of cells of given radius centered on the origin.
+///
+/// A zero-radius ring is a single hex.
+///
+/// # Examples
+///
+/// ```
+/// use hex::hex_ring;
+/// assert_eq!(hex_ring(0).count(), 1);
+/// assert_eq!(hex_ring(1).count(), 6);
+/// ```
+pub fn hex_ring(radius: i32) -> Iter {
+  if radius == 0 {
+    return Box::new(Some(ORIGIN).into_iter());
   }
-  /// All `Hex`es contained in this region.
-  pub fn area(&self) -> Iter {
-    let copy = *self;
-    Box::new(
-      (0..copy.radius+1).flat_map(move |r| {
-        let tmp = Region {center: copy.center, radius: r};
-        tmp.ring()
-      })
-    )
-  }
+  Box::new(
+    RING_SIDES.iter()
+      .flat_map(move |&(start, dir)|
+        (ORIGIN + start.delta()*radius)
+          .axis(dir)
+          .skip(1)
+          .take(radius as usize))
+  )
 }
 
 #[cfg(test)]
@@ -173,11 +176,10 @@ mod tests {
 extern crate quickcheck;
 extern crate rand;
 
-use super::Hex;
-use super::Direction;
-use super::Region;
+use super::{Hex, Direction, hex_ring, ORIGIN};
 
 use std::collections::HashSet;
+use std::ops::Deref;
 
 use self::quickcheck::quickcheck;
 
@@ -244,14 +246,22 @@ impl quickcheck::Arbitrary for Direction {
 #[derive(Clone, Debug)]
 struct SmallPositiveInt(u32);
 
+impl Deref for SmallPositiveInt {
+  type Target = u32;
+  fn deref<'a>(&'a self) -> &'a u32 {
+    let SmallPositiveInt(ref val) = *self;
+    val
+  }
+}
+
 impl quickcheck::Arbitrary for SmallPositiveInt {
   fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
     SmallPositiveInt(g.gen_range(1, 1000))
   }
   fn shrink(&self) -> Box<Iterator<Item=SmallPositiveInt> + 'static> {
-    match *self {
-      SmallPositiveInt(1) => quickcheck::empty_shrinker(),
-      SmallPositiveInt(n) => quickcheck::single_shrinker(SmallPositiveInt(n/2))
+    match **self {
+      1 => quickcheck::empty_shrinker(),
+      n => quickcheck::single_shrinker(SmallPositiveInt(n/2))
     }
   }
 }
@@ -259,10 +269,9 @@ impl quickcheck::Arbitrary for SmallPositiveInt {
 // The difference between subsequent hexes in an axus is the directional delta.
 #[test]
 fn line_delta() {
-  fn prop(p: (Hex, Direction, SmallPositiveInt)) -> bool {
-    let (h, d, SmallPositiveInt(i)) = p;
+  fn prop((h, d, i): (Hex, Direction, SmallPositiveInt)) -> bool {
     let mut prev = h;
-    h.axis(d).skip(1).take(i as usize).all(|pt| {
+    h.axis(d).skip(1).take(*i as usize).all(|pt| {
       let cmp = (pt - prev) == d.delta();
       prev = pt;
       cmp
@@ -274,71 +283,47 @@ fn line_delta() {
 #[derive(Clone, Debug)]
 struct SmallNonNegativeInt(u32);
 
+impl Deref for SmallNonNegativeInt {
+  type Target = u32;
+  fn deref<'a>(&'a self) -> &'a u32 {
+    let SmallNonNegativeInt(ref val) = *self;
+    val
+  }
+}
+
 impl quickcheck::Arbitrary for SmallNonNegativeInt {
   fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
     SmallNonNegativeInt(g.gen_range(0, 1000))
   }
   fn shrink(&self) -> Box<Iterator<Item=SmallNonNegativeInt> + 'static> {
-    match *self {
-      SmallNonNegativeInt(0) => quickcheck::empty_shrinker(),
-      SmallNonNegativeInt(1) => quickcheck::single_shrinker(SmallNonNegativeInt(0)),
-      SmallNonNegativeInt(n) => quickcheck::single_shrinker(SmallNonNegativeInt(n/2)),
+    match **self {
+      0 => quickcheck::empty_shrinker(),
+      1 => quickcheck::single_shrinker(SmallNonNegativeInt(0)),
+      n => quickcheck::single_shrinker(SmallNonNegativeInt(n/2)),
     }
   }
-}
-
-impl quickcheck::Arbitrary for Region {
-  fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
-    let center: Hex = quickcheck::Arbitrary::arbitrary(g);
-    let SmallNonNegativeInt(radius)  = quickcheck::Arbitrary::arbitrary(g);
-    Region { center: center, radius: radius }
-  }
-  fn shrink(&self) -> Box<Iterator<Item=Region> + 'static> {
-    Box::new(self.center.shrink().zip(SmallNonNegativeInt(self.radius).shrink()).map(
-      |(c, SmallNonNegativeInt(r))| { Region { center: c, radius: r} }))
-  }
-}
-
-// A region contains its center point.
-#[test]
-fn contains_center() {
-  fn prop(p: Region) -> bool { p.contains(p.center) }
-  quickcheck(prop as fn(Region) -> bool);
-}
-
-// A region with center P and radius P.moves_to(P') contains P'.
-#[test]
-fn contains_other() {
-  fn prop(p1: Hex, p2: Hex) -> bool {
-    let r = Region { center: p1, radius: p1.moves_to(p2) };
-    r.contains(p2)
-  }
-  quickcheck(prop as fn(Hex, Hex) -> bool);
 }
 
 // Number of hexes in a ring matches the expected function of radius.
 #[test]
 fn ring_len() {
-  fn expected(r: u32) -> usize {
+  fn expected(r: i32) -> usize {
     match r {
       0 => 1,
       x => (x as usize)*6,
     }
   }
-  fn prop(r: Region) -> bool { r.ring().count() == expected(r.radius) }
-  quickcheck(prop as fn(Region) -> bool);
+  fn prop(r: SmallNonNegativeInt) -> bool { hex_ring(*r as i32).count() == expected(*r as i32) }
+  quickcheck(prop as fn(SmallNonNegativeInt) -> bool);
 }
 
-// The number of moves from hexes in a ring to the ring center is the radius of the ring.
+// The number of moves from hexes in a ring to the origin is the radius of the ring.
 #[test]
 fn ring_moves() {
-  fn prop(r: Region) -> bool {
-    r.ring().all(|h| {
-      let dist = r.center.moves_to(h);
-      dist == r.radius
-    })
+  fn prop(r: SmallNonNegativeInt) -> bool {
+    hex_ring(*r as i32).all(|h| { ORIGIN.moves_to(h) == *r })
   }
-  quickcheck(prop as fn(Region) -> bool);
+  quickcheck(prop as fn(SmallNonNegativeInt) -> bool);
 }
 
 }  // mod tests
