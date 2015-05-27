@@ -57,9 +57,9 @@ impl Hex {
   /// use hex::{Hex, ORIGIN};
   /// assert_eq!(ORIGIN.moves_to(Hex {x:1,y:1}), 2);
   /// ```
-  pub fn moves_to(&self, other: Hex) -> u32 {
+  pub fn moves_to(&self, other: Hex) -> i32 {
     let d = *self - other;
-    let mut values = [d.dx().abs() as u32, d.dy().abs() as u32, d.dz().abs() as u32];
+    let mut values = [d.dx().abs(), d.dy().abs(), d.dz().abs()];
     values.sort();
     values[0]+values[1]
   }
@@ -74,7 +74,7 @@ impl Hex {
   pub fn axis(&self, dir: Direction) -> Iter {
     let h = *self;
     Box::new(
-      (0..).map(move |d| h + dir.delta()*(d as i32))
+      (0..).map(move |d| h + dir.delta()*d)
     )
   }
   /// The six neighbor coordinates.
@@ -244,11 +244,11 @@ impl quickcheck::Arbitrary for Direction {
 }
 
 #[derive(Clone, Debug)]
-struct SmallPositiveInt(u32);
+struct SmallPositiveInt(i32);
 
 impl Deref for SmallPositiveInt {
-  type Target = u32;
-  fn deref<'a>(&'a self) -> &'a u32 {
+  type Target = i32;
+  fn deref<'a>(&'a self) -> &'a i32 {
     let SmallPositiveInt(ref val) = *self;
     val
   }
@@ -281,11 +281,11 @@ fn line_delta() {
 }
 
 #[derive(Clone, Debug)]
-struct SmallNonNegativeInt(u32);
+struct SmallNonNegativeInt(i32);
 
 impl Deref for SmallNonNegativeInt {
-  type Target = u32;
-  fn deref<'a>(&'a self) -> &'a u32 {
+  type Target = i32;
+  fn deref<'a>(&'a self) -> &'a i32 {
     let SmallNonNegativeInt(ref val) = *self;
     val
   }
@@ -313,7 +313,7 @@ fn ring_len() {
       x => (x as usize)*6,
     }
   }
-  fn prop(r: SmallNonNegativeInt) -> bool { hex_ring(*r as i32).count() == expected(*r as i32) }
+  fn prop(r: SmallNonNegativeInt) -> bool { hex_ring(*r).count() == expected(*r) }
   quickcheck(prop as fn(SmallNonNegativeInt) -> bool);
 }
 
@@ -321,7 +321,7 @@ fn ring_len() {
 #[test]
 fn ring_moves() {
   fn prop(r: SmallNonNegativeInt) -> bool {
-    hex_ring(*r as i32).all(|h| { ORIGIN.moves_to(h) == *r })
+    hex_ring(*r).all(|h| { ORIGIN.moves_to(h) == *r })
   }
   quickcheck(prop as fn(SmallNonNegativeInt) -> bool);
 }
