@@ -48,15 +48,15 @@ pub type Iter = Box<Iterator<Item=Hex> + 'static>;
 pub type IterSize = Box<ExactSizeIterator<Item=Hex> + 'static>;
 
 impl Hex {
-  /// Returns the "shortest path" distance to `other`.
+  /// Returns the smallest number of single-hex translations to get to `other`.
   ///
   /// # Examples
   ///
   /// ```
   /// use hex::{Hex, ORIGIN};
-  /// assert_eq!(ORIGIN.distance_to(Hex {x:1,y:1}), 2);
+  /// assert_eq!(ORIGIN.moves_to(Hex {x:1,y:1}), 2);
   /// ```
-  pub fn distance_to(&self, other: Hex) -> u32 {
+  pub fn moves_to(&self, other: Hex) -> u32 {
     let d = *self - other;
     let mut values = [d.dx().abs() as u32, d.dy().abs() as u32, d.dz().abs() as u32];
     values.sort();
@@ -82,7 +82,7 @@ impl Hex {
   ///
   /// ```
   /// use hex::{Hex, ORIGIN};
-  /// assert!(ORIGIN.neighbors().all(|h| ORIGIN.distance_to(h) == 1));
+  /// assert!(ORIGIN.neighbors().all(|h| ORIGIN.moves_to(h) == 1));
   /// ```
   pub fn neighbors(&self) -> IterSize {
     let h = *self;
@@ -131,7 +131,7 @@ static RING_SIDES: [(Direction, Direction); 6] =
 
 impl Region {
   /// Whether the given `Hex` is contained in this region.
-  pub fn contains(&self, h: Hex) -> bool { self.center.distance_to(h) <= self.radius }
+  pub fn contains(&self, h: Hex) -> bool { self.center.moves_to(h) <= self.radius }
   /// The outer ring of `Hex`es of this region.
   ///
   /// # Examples
@@ -224,10 +224,10 @@ fn overlap_neighbors() {
   quickcheck(prop as fn(Hex) -> bool);
 }
 
-// The distance from a hex to its neighbors is 1.
+// The number of moves from a hex to its neighbors is 1.
 #[test]
-fn neighbor_distance() {
-  fn prop(h: Hex) -> bool { h.neighbors().all(|n| h.distance_to(n) == 1) }
+fn neighbor_moves() {
+  fn prop(h: Hex) -> bool { h.neighbors().all(|n| h.moves_to(n) == 1) }
   quickcheck(prop as fn(Hex) -> bool);
 }
 
@@ -306,11 +306,11 @@ fn contains_center() {
   quickcheck(prop as fn(Region) -> bool);
 }
 
-// A region with center P and radius P.distance_to(P') contains P'.
+// A region with center P and radius P.moves_to(P') contains P'.
 #[test]
 fn contains_other() {
   fn prop(p1: Hex, p2: Hex) -> bool {
-    let r = Region { center: p1, radius: p1.distance_to(p2) };
+    let r = Region { center: p1, radius: p1.moves_to(p2) };
     r.contains(p2)
   }
   quickcheck(prop as fn(Hex, Hex) -> bool);
@@ -329,12 +329,12 @@ fn ring_len() {
   quickcheck(prop as fn(Region) -> bool);
 }
 
-// The distance from hexes in a ring to the ring center is the radius of the ring.
+// The number of moves from hexes in a ring to the ring center is the radius of the ring.
 #[test]
-fn ring_distance() {
+fn ring_moves() {
   fn prop(r: Region) -> bool {
     r.ring().all(|h| {
-      let dist = r.center.distance_to(h);
+      let dist = r.center.moves_to(h);
       dist == r.radius
     })
   }
