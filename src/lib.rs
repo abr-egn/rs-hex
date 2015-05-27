@@ -42,7 +42,7 @@ impl Hex {
   pub fn x(&self) -> i32 { self.x }
   pub fn y(&self) -> i32 { self.y }
   pub fn z(&self) -> i32 { 0 - (self.x + self.y) }
-  /// Returns the smallest number of single-hex translations to get to `other`.
+  /// The smallest number of single-hex translations to get to `other`.
   ///
   /// # Examples
   ///
@@ -56,6 +56,18 @@ impl Hex {
     values.sort();
     values[0]+values[1]
   }
+  /// The distance to the other hex as a straight-line path.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use hex::{Hex, ORIGIN};
+  /// assert_eq!(ORIGIN.distance_to(ORIGIN), 0);
+  /// assert_eq!(ORIGIN.distance_to(Hex{x:1,y:0}), 1);
+  /// assert_eq!(ORIGIN.distance_to(Hex{x:1,y:1}), 2);
+  /// assert_eq!(ORIGIN.distance_to(Hex{x:1,y:2}), 3);
+  /// ```
+  pub fn distance_to(&self, other: Hex) -> i32 { (*self - other).length() }
   /// A sequence of hexes along the given direction, including `self`.
   ///
   /// # Examples
@@ -97,9 +109,9 @@ impl Delta {
   /// ```
   /// use hex::{Delta};
   /// assert_eq!(Delta{dx:0,dy:0}.length(), 0);
-  /// assert_eq!(Delta{dx:1,dy:2}.length(), 4);
+  /// assert_eq!(Delta{dx:1,dy:2}.length(), 3);
   /// ```
-  pub fn length(&self) -> i32 { (self.dx().abs() + self.dy().abs() + self.dz().abs() / 2) as i32 }
+  pub fn length(&self) -> i32 { ((self.dx().abs() + self.dy().abs() + self.dz().abs()) / 2) as i32 }
 }
 
 /// The six cardinal directions of movement, named as `<increment coordinate><decrement coordinate>`.
@@ -240,6 +252,13 @@ fn overlap_neighbors() {
 fn neighbor_moves() {
   fn prop(h: Hex) -> bool { h.neighbors().all(|n| h.moves_to(n) == 1) }
   quickcheck(prop as fn(Hex) -> bool);
+}
+
+// Number of moves between hexes is <= the line distance.
+#[test]
+fn move_distance() {
+  fn prop(h1: Hex, h2: Hex) -> bool { h1.moves_to(h2) <= h1.distance_to(h2) }
+  quickcheck(prop as fn(Hex, Hex) -> bool);
 }
 
 impl quickcheck::Arbitrary for Direction {
