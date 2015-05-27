@@ -233,9 +233,9 @@ fn overlap_neighbors() {
   quickcheck(prop as fn(Hex) -> bool);
 }
 
-// The number of moves from a hex to its neighbors is 1.
+// The distance from a hex to its neighbors is 1.
 #[test]
-fn neighbor_moves() {
+fn neighbor_distance() {
   fn prop(h: Hex) -> bool { h.neighbors().all(|n| h.distance_to(n) == 1) }
   quickcheck(prop as fn(Hex) -> bool);
 }
@@ -324,9 +324,9 @@ fn ring_len() {
   quickcheck(prop as fn(SmallNonNegativeInt) -> bool);
 }
 
-// The number of moves from hexes in a ring to the origin is the radius of the ring.
+// The distance from hexes in a ring to the origin is the radius of the ring.
 #[test]
-fn ring_moves() {
+fn ring_distance() {
   fn prop(r: SmallNonNegativeInt) -> bool {
     hex_ring(*r).all(|h| { ORIGIN.distance_to(h) == *r })
   }
