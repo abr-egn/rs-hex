@@ -1,3 +1,5 @@
+pub mod gosper;
+
 use std::cmp;
 use std::ops::{Add,Sub,Mul};
 
@@ -69,7 +71,7 @@ impl Hex {
     /// assert_eq!(ORIGIN.distance_to(Hex{x:1,y:1}), 2);
     /// assert_eq!(ORIGIN.distance_to(Hex{x:1,y:2}), 3);
     /// ```
-    pub fn distance_to(&self, other: Hex) -> i32 { (*self - other).length() }
+    pub fn distance_to(&self, other: Hex) -> u32 { (*self - other).length() }
     /// A sequence of hexes along the given direction, including `self`.
     ///
     /// # Examples
@@ -138,7 +140,7 @@ impl Delta {
     /// assert_eq!(Delta{dx:0,dy:0}.length(), 0);
     /// assert_eq!(Delta{dx:1,dy:2}.length(), 3);
     /// ```
-    pub fn length(&self) -> i32 { ((self.dx().abs() + self.dy().abs() + self.dz().abs()) / 2) as i32 }
+    pub fn length(&self) -> u32 { ((self.dx().abs() + self.dy().abs() + self.dz().abs()) / 2) as u32 }
     /// Rotate this delta.
     pub fn rotate(&self, dir: Rotation) -> Delta {
         match dir {
@@ -182,14 +184,15 @@ static DIRECTIONS: [Direction; 6] = [Direction::XY, Direction::XZ, Direction::YZ
 /// assert_eq!(hex_area(0).count(), 1);
 /// assert_eq!(hex_area(1).count(), 7);
 /// ```
-pub fn hex_area(radius: i32) -> Iter {
+pub fn hex_area(radius: u32) -> Iter {
+    let irad = radius as i32;
     Box::new(
-        (-radius..radius+1).flat_map(move |q| {
-            let r1 = cmp::max(-radius, -q - radius);
-            let r2 = cmp::min(radius, -q + radius);
+        (-irad..irad+1).flat_map(move |q| {
+            let r1 = cmp::max(-irad, -q - irad);
+            let r2 = cmp::min(irad, -q + irad);
             (r1..r2+1).map(move |r| Hex{x:q, y:r})
         })
-        )
+    )
 }
 
 static RING_SIDES: [(Direction, Direction); 6] =
@@ -211,14 +214,14 @@ static RING_SIDES: [(Direction, Direction); 6] =
 /// assert_eq!(hex_ring(0).count(), 1);
 /// assert_eq!(hex_ring(1).count(), 6);
 /// ```
-pub fn hex_ring(radius: i32) -> Iter {
+pub fn hex_ring(radius: u32) -> Iter {
     if radius == 0 {
         return Box::new(Some(ORIGIN).into_iter());
     }
     Box::new(
         RING_SIDES.iter()
         .flat_map(move |&(start, dir)|
-                  (ORIGIN + start.delta()*radius)
+                  (ORIGIN + start.delta()*(radius as i32))
                   .axis(dir)
                   .skip(1)
                   .take(radius as usize))
@@ -404,7 +407,7 @@ mod tests {
 
     impl quickcheck::Arbitrary for SmallPositiveInt {
         fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
-            SmallPositiveInt(g.gen_range(1, 1000))
+            SmallPositiveInt(g.gen_range(1, 100))
         }
         fn shrink(&self) -> Box<Iterator<Item=SmallPositiveInt> + 'static> {
             match **self {
@@ -498,7 +501,7 @@ mod tests {
 
     impl quickcheck::Arbitrary for SmallNonNegativeInt {
         fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
-            SmallNonNegativeInt(g.gen_range(0, 1000))
+            SmallNonNegativeInt(g.gen_range(0, 100))
         }
         fn shrink(&self) -> Box<Iterator<Item=SmallNonNegativeInt> + 'static> {
             match **self {
