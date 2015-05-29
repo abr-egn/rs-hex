@@ -1,4 +1,4 @@
-use super::{Hex, Delta, Direction};
+use super::{Hex, Delta, Direction, Rotation, Iter};
 
 use std::ops::Div;
 
@@ -25,7 +25,30 @@ pub struct Island { pub center: Hex, pub level: u32 }
 
 impl Island {
     pub fn split(&self) -> Option<(Island, Vec<(Direction, Island)>)> {
-        None
+        if self.level == 0 {
+            return None;
+        }
+        let middle = Island {center: self.center, level: self.level-1};
+        let split_offset = offset(self.level-1);
+        let side = |n| {
+            let mut center = self.center + split_offset;
+            for _ in (0..n) {
+                center = center.rotate_around(self.center, Rotation::CW);
+            }
+            center
+        };
+        let side_dirs = vec![Direction::XY, Direction::XZ, Direction::YZ,
+                             Direction::YX, Direction::ZX, Direction::ZY];
+        let sides = (0..6).map(|n| Island {center: side(n), level: self.level-1});
+        Some((middle, side_dirs.into_iter().zip(sides).collect()))
+    }
+
+    pub fn hexes(&self) -> Iter {
+        if self.level == 0 {
+            return Box::new(Some(self.center).into_iter());
+        }
+        let (middle, sides) = self.split().unwrap();
+        Box::new(middle.hexes().chain(sides.into_iter().flat_map(|(_, s)| s.hexes())))
     }
 }
 
