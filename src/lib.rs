@@ -19,6 +19,14 @@ impl Add<Delta> for Hex {
     }
 }
 
+impl Add<Hex> for Delta {
+    type Output = Hex;
+
+    fn add(self, Hex {x, y}: Hex) -> Hex {
+        Hex {x: x+self.dx, y: y+self.dy}
+    }
+}
+
 impl Sub for Hex {
     type Output = Delta; 
 
@@ -32,6 +40,14 @@ impl Mul<i32> for Delta {
 
     fn mul(self, f: i32) -> Delta {
         Delta {dx: self.dx*f, dy: self.dy*f}
+    }
+}
+
+impl Mul<Delta> for i32 {
+    type Output = Delta;
+
+    fn mul(self, Delta {dx, dy}: Delta) -> Delta {
+        Delta {dx: self*dx, dy: self*dy}
     }
 }
 
@@ -249,7 +265,7 @@ mod tests {
     extern crate quickcheck;
     extern crate rand;
 
-    use super::{Hex, Direction, hex_ring, hex_area, ORIGIN};
+    use super::{Hex, Delta, Direction, Rotation, hex_ring, hex_area, ORIGIN};
 
     use std::collections::HashSet;
     use std::collections::HashMap;
@@ -401,7 +417,7 @@ mod tests {
     // The difference between subsequent hexes in an axis is the directional delta.
     #[test]
     fn line_delta() {
-        fn prop((h, d, i): (Hex, Direction, SmallPositiveInt)) -> bool {
+        fn prop(h: Hex, d: Direction, i: SmallPositiveInt) -> bool {
             let mut prev = h;
             h.axis(d).skip(1).take(*i as usize).all(|pt| {
                 let cmp = (pt - prev) == d.delta();
@@ -409,7 +425,64 @@ mod tests {
                 cmp
             })
         }
-        quickcheck(prop as fn((Hex, Direction, SmallPositiveInt)) -> bool);
+        quickcheck(prop as fn(Hex, Direction, SmallPositiveInt) -> bool);
+    }
+
+    impl quickcheck::Arbitrary for Rotation {
+        fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
+            match g.gen_range(0, 2) {
+                0 => Rotation::CW,
+                1 => Rotation::CCW,
+                _ => panic!("Invalid arbitrary rotation"),
+            }
+        }
+    }
+
+    // Rotating a hex six times yields the original hex.
+    #[test]
+    fn rotate_identity() {
+        fn prop(h1: Hex, h2: Hex, r: Rotation) -> bool {
+            let mut h = h1;
+            for _ in (0..6) {
+                h = h.rotate_around(h2, r);
+            }
+            h == h1
+        }
+        quickcheck(prop as fn(Hex, Hex, Rotation) -> bool);
+    }
+
+    impl quickcheck::Arbitrary for Delta {
+        fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
+            let Hex {x, y} = quickcheck::Arbitrary::arbitrary(g);
+            Delta {dx: x, dy: y}
+        }
+        fn shrink(&self) -> Box<Iterator<Item=Delta> + 'static> {
+            Box::new(Hex {x: self.dx, y: self.dy}.shrink().map(|Hex {x, y}| Delta {dx: x, dy: y}))
+        }
+    }
+
+    // Rotating a delta six times yields the original delta.
+    #[test]
+    fn rotate_delta_identity() {
+        fn prop(d0: Delta, r: Rotation) -> bool {
+            let mut d = d0;
+            for _ in (0..6) {
+                d = d.rotate(r);
+            }
+            d == d0
+        }
+        quickcheck(prop as fn(Delta, Rotation) -> bool);
+    }
+
+    // Rotating a hex is the same as rotating a delta and adding to the center.
+    #[test]
+    fn rotate_by_delta() {
+        fn prop(h1: Hex, h2: Hex, r: Rotation) -> Result<bool, String> {
+            let r1 = h1.rotate_around(h2, r);
+            let r2 = (h1 - h2).rotate(r) + h2;
+            if r1 == r2 { Ok(true) } else { Err(format!("r1 = {:?}, r2 = {:?}", r1, r2)) }
+        }
+        quickcheck(prop as fn(Hex, Hex, Rotation) -> Result<bool, String>);
     }
 
     #[derive(Clone, Debug)]
