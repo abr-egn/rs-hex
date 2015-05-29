@@ -123,6 +123,13 @@ impl Delta {
     /// assert_eq!(Delta{dx:1,dy:2}.length(), 3);
     /// ```
     pub fn length(&self) -> i32 { ((self.dx().abs() + self.dy().abs() + self.dz().abs()) / 2) as i32 }
+    /// Rotate this delta.
+    pub fn rotate(&self, dir: Rotation) -> Delta {
+        match dir {
+            Rotation::CW    => Delta { dx: -self.dy(), dy: -self.dz() },
+            Rotation::CCW   => Delta { dx: -self.dz(), dy: -self.dx() },
+        }
+    }
 }
 
 /// The six cardinal directions of movement, named as `<increment coordinate><decrement coordinate>`.
@@ -242,7 +249,7 @@ mod tests {
     extern crate quickcheck;
     extern crate rand;
 
-    use super::{Hex, Direction, hex_ring, ORIGIN};
+    use super::{Hex, Direction, hex_ring, hex_area, ORIGIN};
 
     use std::collections::HashSet;
     use std::collections::HashMap;
@@ -264,14 +271,14 @@ mod tests {
     }
 
     // A hex has six neighbors.
-#[test]
+    #[test]
     fn six_neighbors() {
         fn prop(h: Hex) -> bool { h.neighbors().count() == 6 }
         quickcheck(prop as fn(Hex) -> bool);
     }
 
     // The neighbors of the neighbors of a hex include that hex.
-#[test]
+    #[test]
     fn transitive_neighbors() {
         fn prop(h: Hex) -> bool {
             h.neighbors().all(|n| n.neighbors().any(|nn| nn == h))
@@ -281,7 +288,7 @@ mod tests {
 
     // The neighbors of the neighbors of a hex have two hexes in common with
     // the neighbors of that hex.
-#[test]
+    #[test]
     fn overlap_neighbors() {
         fn prop(h: Hex) -> bool {
             let ns: HashSet<Hex> = h.neighbors().collect();
@@ -293,22 +300,29 @@ mod tests {
         quickcheck(prop as fn(Hex) -> bool);
     }
 
+    // Distance is not negative.
+    #[test]
+    fn non_negative_distance() {
+        fn prop(h1: Hex, h2: Hex) -> bool { h1.distance_to(h2) >= 0 }
+        quickcheck(prop as fn(Hex, Hex) -> bool);
+    }
+
     // The distance from a hex to its neighbors is 1.
-#[test]
+    #[test]
     fn neighbor_distance() {
         fn prop(h: Hex) -> bool { h.neighbors().all(|n| h.distance_to(n) == 1) }
         quickcheck(prop as fn(Hex) -> bool);
     }
 
     // Last hex in a line is the target hex.
-#[test]
+    #[test]
     fn line_end() {
         fn prop(h1: Hex, h2: Hex) -> bool { h1.line_to(h2).last().unwrap() == h2 }
         quickcheck(prop as fn(Hex, Hex) -> bool);
     }
 
     // The distance between sequential hexes in a line is 1.
-#[test]
+    #[test]
     fn line_dist() {
         fn prop(h1: Hex, h2: Hex) -> bool {
             let mut prev = h1;
@@ -321,11 +335,11 @@ mod tests {
         quickcheck(prop as fn(Hex, Hex) -> bool);
     }
 
-#[derive(PartialEq, Eq, Copy, Clone, Hash, Debug)]
+    #[derive(PartialEq, Eq, Copy, Clone, Hash, Debug)]
     enum Axis { X, Y, Z }
 
     // At least one axis is consistently incremented/decremented on each line step.
-#[test]
+    #[test]
     fn line_steps() {
         fn prop(h1: Hex, h2: Hex) -> bool {
             let mut updates = HashMap::new();
@@ -361,7 +375,7 @@ mod tests {
         }
     }
 
-#[derive(Clone, Debug)]
+    #[derive(Clone, Debug)]
     struct SmallPositiveInt(i32);
 
     impl Deref for SmallPositiveInt {
@@ -385,7 +399,7 @@ mod tests {
     }
 
     // The difference between subsequent hexes in an axis is the directional delta.
-#[test]
+    #[test]
     fn line_delta() {
         fn prop((h, d, i): (Hex, Direction, SmallPositiveInt)) -> bool {
             let mut prev = h;
@@ -398,7 +412,7 @@ mod tests {
         quickcheck(prop as fn((Hex, Direction, SmallPositiveInt)) -> bool);
     }
 
-#[derive(Clone, Debug)]
+    #[derive(Clone, Debug)]
     struct SmallNonNegativeInt(i32);
 
     impl Deref for SmallNonNegativeInt {
@@ -422,9 +436,9 @@ mod tests {
         }
     }
 
-    // Number of hexes in a ring matches the expected function of radius.
-#[test]
-    fn ring_len() {
+    // Number of hexes in a hex ring matches the expected function of radius.
+    #[test]
+    fn hex_ring_len() {
         fn expected(r: i32) -> usize {
             match r {
                 0 => 1,
@@ -435,12 +449,27 @@ mod tests {
         quickcheck(prop as fn(SmallNonNegativeInt) -> bool);
     }
 
-    // The distance from hexes in a ring to the origin is the radius of the ring.
-#[test]
-    fn ring_distance() {
+    // The distance from hexes in a hex ring to the origin is the radius of the ring.
+    #[test]
+    fn hex_ring_distance() {
         fn prop(r: SmallNonNegativeInt) -> bool {
             hex_ring(*r).all(|h| { ORIGIN.distance_to(h) == *r })
         }
+        quickcheck(prop as fn(SmallNonNegativeInt) -> bool);
+    }
+
+    // Number of hexes in a hex area matches the expected function of radius.
+    #[test]
+    fn hex_area_len() {
+        fn expected(r: i32) -> usize { (3*r.pow(2) + 3*r + 1) as usize }
+        fn prop(r: SmallNonNegativeInt) -> bool { hex_area(*r).count() == expected(*r) }
+        quickcheck(prop as fn(SmallNonNegativeInt) -> bool);
+    }
+
+    // The distance from hexes in a hex area to the origin is <= the radius of the area.
+    #[test]
+    fn hex_area_distance() {
+        fn prop(r: SmallNonNegativeInt) -> bool { hex_area(*r).all(|h| ORIGIN.distance_to(h) <= *r) }
         quickcheck(prop as fn(SmallNonNegativeInt) -> bool);
     }
 
