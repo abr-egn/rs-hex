@@ -52,6 +52,14 @@ impl Island {
     }
 }
 
+/// Gosper Space Partition: coordinate addressing for nested Gosper islands.
+#[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash)]
+pub struct GSP { pub coord: Hex, pub level: u32 }
+
+impl GSP {
+
+}
+
 #[cfg(test)]
 mod tests {
     extern crate quickcheck;

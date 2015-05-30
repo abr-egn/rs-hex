@@ -74,18 +74,18 @@ impl Hex {
     /// assert_eq!(ORIGIN.distance_to(Hex{x:1,y:2}), 3);
     /// ```
     pub fn distance_to(&self, other: Hex) -> u32 { (*self - other).length() }
-    /// A sequence of hexes along the given direction, including `self`.
+    /// A sequence of hexes along the given direction, not including `self`.
     ///
     /// # Examples
     ///
     /// ```
     /// use hex::{Hex, Direction, ORIGIN};
-    /// assert_eq!(ORIGIN.axis(Direction::XY).nth(5).unwrap(), Hex {x:5,y:-5});
+    /// assert_eq!(ORIGIN.ray(Direction::XY).nth(4).unwrap(), Hex {x:5,y:-5});
     /// ```
-    pub fn axis(&self, dir: Direction) -> Iter {
+    pub fn ray(&self, dir: Direction) -> Iter {
         let h = *self;
         Box::new(
-            (0..).map(move |d| h + dir.delta()*d)
+            (1..).map(move |d| h + dir.delta()*d)
             )
     }
     /// The six neighbor coordinates.
@@ -102,7 +102,7 @@ impl Hex {
             Direction::all().map(move |d| h + d.delta())
             )
     }
-    /// A straight line to the target hex.
+    /// A straight line to the target hex, not including `self`.
     ///
     /// # Examples
     ///
@@ -126,6 +126,17 @@ impl Hex {
             Rotation::CW    => Hex { x: center.x - y, y: center.y - z },
             Rotation::CCW   => Hex { x: center.x - z, y: center.y - x },
         }
+    }
+    /// Direction-aligned path from the origin to this hex, as (direction, number of steps).
+    pub fn path(&self) -> Vec<(Direction, u32)> {
+        let mut coords = [(Axis::X, self.x()), (Axis::Y, self.y()), (Axis::Z, self.z())];
+        coords.sort_by(|&(_, a), &(_, b)| a.abs().cmp(&b.abs()));
+        let (least, minor, major) = (coords[0], coords[1], coords[2]);
+        let align_dir = if least.1 < 0 { Axis::direction(major.0, least.0) } else { Axis::direction(least.0, major.0) };
+        let align_mag = least.1.abs() as u32;
+        let axis_dir = if minor.1 < 0 { Axis::direction(major.0, minor.0) } else { Axis::direction(minor.0, major.0) };
+        let axis_mag = minor.1.abs() as u32;
+        vec![(axis_dir.unwrap(), axis_mag), (align_dir.unwrap(), align_mag)]
     }
 }
 
@@ -198,12 +209,12 @@ pub fn hex_area(radius: u32) -> Iter {
 }
 
 static RING_SIDES: [(Direction, Direction); 6] =
-[(Direction::XY, Direction::YZ),
-(Direction::XZ, Direction::YX),
-(Direction::YZ, Direction::ZX),
-(Direction::YX, Direction::ZY),
-(Direction::ZX, Direction::XY),
-(Direction::ZY, Direction::XZ)];
+    [(Direction::XY, Direction::YZ),
+     (Direction::XZ, Direction::YX),
+     (Direction::YZ, Direction::ZX),
+     (Direction::YX, Direction::ZY),
+     (Direction::ZX, Direction::XY),
+     (Direction::ZY, Direction::XZ)];
 
 /// A hexagonal ring of cells of given radius centered on the origin.
 ///
@@ -224,8 +235,7 @@ pub fn hex_ring(radius: u32) -> Iter {
         RING_SIDES.iter()
         .flat_map(move |&(start, dir)|
                   (ORIGIN + start.delta()*(radius as i32))
-                  .axis(dir)
-                  .skip(1)
+                  .ray(dir)
                   .take(radius as usize))
         )
 }
@@ -264,13 +274,30 @@ fn hex_lerp(a: Hex, b: Hex, t: f32) -> FHex {
 #[derive(PartialEq, Eq, Copy, Clone, Hash, Debug)]
 pub enum Rotation { CW, CCW }
 
+#[derive(PartialEq, Eq, Copy, Clone, Hash, Debug)]
+pub enum Axis { X, Y, Z }
+
+impl Axis {
+    pub fn direction(a: Axis, b: Axis) -> Option<Direction> {
+        match (a, b) {
+            (Axis::X, Axis::Y)  => Some(Direction::XY),
+            (Axis::X, Axis::Z)  => Some(Direction::XZ),
+            (Axis::Y, Axis::Z)  => Some(Direction::YZ),
+            (Axis::Y, Axis::X)  => Some(Direction::YX),
+            (Axis::Z, Axis::X)  => Some(Direction::ZX),
+            (Axis::Z, Axis::Y)  => Some(Direction::ZY),
+            _       => None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
     extern crate quickcheck;
     extern crate rand;
 
-    use super::{Hex, Delta, Direction, Rotation, hex_ring, hex_area, ORIGIN};
+    use super::{Hex, Delta, Direction, Rotation, Axis, hex_ring, hex_area, ORIGIN};
     use super::test_util::{SmallPositiveInt, SmallNonNegativeInt};
 
     use std::collections::HashSet;
@@ -336,9 +363,6 @@ mod tests {
         quickcheck(prop as fn(Hex, Hex) -> bool);
     }
 
-    #[derive(PartialEq, Eq, Copy, Clone, Hash, Debug)]
-    enum Axis { X, Y, Z }
-
     // At least one axis is consistently incremented/decremented on each line step.
     #[test]
     fn line_steps() {
@@ -366,12 +390,26 @@ mod tests {
         quickcheck(prop as fn(Hex, Hex) -> bool);
     }
 
-    // The difference between subsequent hexes in an axis is the directional delta.
+    // The distance from the origin is the sum of the path step counts.
     #[test]
-    fn line_delta() {
+    fn line_path() {
+        fn prop(h: Hex) -> Result<bool, String> {
+            let dist = ORIGIN.distance_to(h);
+            let path = h.path();
+            let path_len = path.iter().fold(0, |n, &(_, i)| n+i);
+            if dist == path_len { Ok(true) } else {
+                Err(format!("dist = {:?} path_len = {:?} path = {:?}", dist, path_len, path))
+            }
+        }
+        quickcheck(prop as fn(Hex) -> Result<bool, String>);
+    }
+
+    // The difference between subsequent hexes in a ray is the directional delta.
+    #[test]
+    fn ray_delta() {
         fn prop(h: Hex, d: Direction, i: SmallPositiveInt) -> bool {
             let mut prev = h;
-            h.axis(d).skip(1).take(*i as usize).all(|pt| {
+            h.ray(d).take(*i as usize).all(|pt| {
                 let cmp = (pt - prev) == d.delta();
                 prev = pt;
                 cmp
