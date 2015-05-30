@@ -54,6 +54,46 @@ impl Island {
 
 #[cfg(test)]
 mod tests {
+    extern crate quickcheck;
+    extern crate rand;
+
+    use super::{Island};
+
+    use self::quickcheck::quickcheck;
+
+    use std::collections::HashSet;
+
+    impl quickcheck::Arbitrary for Island {
+        fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
+            let center = quickcheck::Arbitrary::arbitrary(g);
+            let level = g.gen_range(0, 5);
+            Island {center: center, level: level}
+        }
+        fn shrink(&self) -> Box<Iterator<Item=Island>> {
+            let level = self.level;
+            let shrink_center = self.center.shrink().map(move |h| Island {center: h, level: level});
+            if level == 0 {
+                Box::new(shrink_center)
+            } else {
+                Box::new(Some(Island {center: self.center, level: self.level-1}).into_iter().chain(shrink_center))
+            }
+        }
+    }
+
+    // Number of hexes in a Gosper island is 7^level
     #[test]
-    fn empty() { }
+    fn island_size() {
+        fn prop(i: Island) -> bool { i.hexes().count() == (7 as usize).pow(i.level) }
+        quickcheck(prop as fn(Island) -> bool);
+    }
+
+    // All hexes in a Gosper island are unique
+    #[test]
+    fn island_unique() {
+        fn prop(i: Island) -> bool {
+            let hs: HashSet<_> = i.hexes().collect();
+            hs.len() == (7 as usize).pow(i.level)
+        }
+        quickcheck(prop as fn(Island) -> bool);
+    }
 }  // mod tests
