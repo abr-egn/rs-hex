@@ -56,4 +56,4 @@ impl Island {
 mod tests {
     #[test]
     fn empty() { }
-}
+}  // mod tests

@@ -1,4 +1,6 @@
 pub mod gosper;
+#[cfg(test)]
+mod test_util;
 
 use std::cmp;
 use std::ops::{Add,Sub,Mul};
@@ -269,25 +271,12 @@ mod tests {
     extern crate rand;
 
     use super::{Hex, Delta, Direction, Rotation, hex_ring, hex_area, ORIGIN};
+    use super::test_util::{SmallPositiveInt, SmallNonNegativeInt};
 
     use std::collections::HashSet;
     use std::collections::HashMap;
-    use std::ops::Deref;
 
     use self::quickcheck::quickcheck;
-
-    impl quickcheck::Arbitrary for Hex {
-        fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
-            let x = g.gen_range(-1000, 1000);
-            let y = g.gen_range(-1000, 1000);
-            Hex {x: x, y: y}
-        }
-        fn shrink(&self) -> Box<Iterator<Item=Hex> + 'static> {
-            let xy = (self.x, self.y).shrink();
-            let out = xy.map(|(x, y)| Hex {x: x, y: y});
-            Box::new(out)
-        }
-    }
 
     // A hex has six neighbors.
     #[test]
@@ -317,13 +306,6 @@ mod tests {
             })
         }
         quickcheck(prop as fn(Hex) -> bool);
-    }
-
-    // Distance is not negative.
-    #[test]
-    fn non_negative_distance() {
-        fn prop(h1: Hex, h2: Hex) -> bool { h1.distance_to(h2) >= 0 }
-        quickcheck(prop as fn(Hex, Hex) -> bool);
     }
 
     // The distance from a hex to its neighbors is 1.
@@ -384,39 +366,6 @@ mod tests {
         quickcheck(prop as fn(Hex, Hex) -> bool);
     }
 
-    impl quickcheck::Arbitrary for Direction {
-        // Should be able to derive(Rand) for Direction and just do { g.gen() } for
-        // this, but derive(Rand) is deprecated in favor of a derive_rand macro in
-        // an external crate (wtf?).
-        fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
-            let n = g.gen_range(0, 6);
-            Direction::all().nth(n).unwrap().clone()
-        }
-    }
-
-    #[derive(Clone, Debug)]
-    struct SmallPositiveInt(i32);
-
-    impl Deref for SmallPositiveInt {
-        type Target = i32;
-        fn deref<'a>(&'a self) -> &'a i32 {
-            let SmallPositiveInt(ref val) = *self;
-            val
-        }
-    }
-
-    impl quickcheck::Arbitrary for SmallPositiveInt {
-        fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
-            SmallPositiveInt(g.gen_range(1, 100))
-        }
-        fn shrink(&self) -> Box<Iterator<Item=SmallPositiveInt> + 'static> {
-            match **self {
-                1 => quickcheck::empty_shrinker(),
-                n => quickcheck::single_shrinker(SmallPositiveInt(n/2))
-            }
-        }
-    }
-
     // The difference between subsequent hexes in an axis is the directional delta.
     #[test]
     fn line_delta() {
@@ -431,16 +380,6 @@ mod tests {
         quickcheck(prop as fn(Hex, Direction, SmallPositiveInt) -> bool);
     }
 
-    impl quickcheck::Arbitrary for Rotation {
-        fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
-            match g.gen_range(0, 2) {
-                0 => Rotation::CW,
-                1 => Rotation::CCW,
-                _ => panic!("Invalid arbitrary rotation"),
-            }
-        }
-    }
-
     // Rotating a hex six times yields the original hex.
     #[test]
     fn rotate_identity() {
@@ -452,16 +391,6 @@ mod tests {
             h == h1
         }
         quickcheck(prop as fn(Hex, Hex, Rotation) -> bool);
-    }
-
-    impl quickcheck::Arbitrary for Delta {
-        fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
-            let Hex {x, y} = quickcheck::Arbitrary::arbitrary(g);
-            Delta {dx: x, dy: y}
-        }
-        fn shrink(&self) -> Box<Iterator<Item=Delta> + 'static> {
-            Box::new(Hex {x: self.dx, y: self.dy}.shrink().map(|Hex {x, y}| Delta {dx: x, dy: y}))
-        }
     }
 
     // Rotating a delta six times yields the original delta.
@@ -488,34 +417,10 @@ mod tests {
         quickcheck(prop as fn(Hex, Hex, Rotation) -> Result<bool, String>);
     }
 
-    #[derive(Clone, Debug)]
-    struct SmallNonNegativeInt(i32);
-
-    impl Deref for SmallNonNegativeInt {
-        type Target = i32;
-        fn deref<'a>(&'a self) -> &'a i32 {
-            let SmallNonNegativeInt(ref val) = *self;
-            val
-        }
-    }
-
-    impl quickcheck::Arbitrary for SmallNonNegativeInt {
-        fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
-            SmallNonNegativeInt(g.gen_range(0, 100))
-        }
-        fn shrink(&self) -> Box<Iterator<Item=SmallNonNegativeInt> + 'static> {
-            match **self {
-                0 => quickcheck::empty_shrinker(),
-                1 => quickcheck::single_shrinker(SmallNonNegativeInt(0)),
-                n => quickcheck::single_shrinker(SmallNonNegativeInt(n/2)),
-            }
-        }
-    }
-
     // Number of hexes in a hex ring matches the expected function of radius.
     #[test]
     fn hex_ring_len() {
-        fn expected(r: i32) -> usize {
+        fn expected(r: u32) -> usize {
             match r {
                 0 => 1,
                 x => (x as usize)*6,
@@ -537,7 +442,7 @@ mod tests {
     // Number of hexes in a hex area matches the expected function of radius.
     #[test]
     fn hex_area_len() {
-        fn expected(r: i32) -> usize { (3*r.pow(2) + 3*r + 1) as usize }
+        fn expected(r: u32) -> usize { (3*r.pow(2) + 3*r + 1) as usize }
         fn prop(r: SmallNonNegativeInt) -> bool { hex_area(*r).count() == expected(*r) }
         quickcheck(prop as fn(SmallNonNegativeInt) -> bool);
     }
