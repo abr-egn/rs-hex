@@ -1,4 +1,4 @@
-use super::{Hex, Delta, Direction, Rotation, Iter};
+use super::{Hex, Delta, Direction, Rotation, Iter, ORIGIN};
 
 use std::ops::Div;
 
@@ -56,8 +56,72 @@ impl Island {
 #[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash)]
 pub struct GSP { pub coord: Hex, pub level: u32 }
 
-impl GSP {
+fn fold_path(xy: Delta, h: Hex) -> Delta {
+    // TODO: use std::iter::iterate when it's stable
+    let xz = xy.rotate(Rotation::CW);
+    let yz = xz.rotate(Rotation::CW);
+    let yx = yz.rotate(Rotation::CW);
+    let zx = yx.rotate(Rotation::CW);
+    let zy = zx.rotate(Rotation::CW);
+    let dir_delta = |dir| match dir {
+        Direction::XY   => xy,
+        Direction::XZ   => xz,
+        Direction::YZ   => yz,
+        Direction::YX   => yx,
+        Direction::ZX   => zx,
+        Direction::ZY   => zy,
+    };
+    let steps = h.path();
+    let trans = steps.into_iter().map(|(d, m)| dir_delta(d) * (m as i32));
+    // TODO: use sum() when std::num::Zero is stable
+    let mut ret = Delta {dx: 0, dy: 0};
+    for d in trans {
+        ret = ret + d;
+    }
+    ret
+}
 
+impl GSP {
+    pub fn absolute(&self) -> Island {
+        if self.level == 0 {
+            return Island {center: self.coord, level: 0};
+        }
+        Island {center: ORIGIN + fold_path(offset(self.level), self.coord), level: self.level}
+    }
+
+    fn delta(&self) -> Delta {
+        if self.level % 2 == 0 { Delta {dx: 3, dy: -2} } else { Delta {dx: 2, dy: -3} }
+    }
+
+    fn path_delta(&self) -> Delta { fold_path(self.delta(), self.coord) }
+
+    pub fn smaller(&self) -> Option<GSP> {
+        if self.level == 0 {
+            return None;
+        }
+        Some(GSP {coord: ORIGIN + self.path_delta(), level: self.level-1})
+    }
+
+    pub fn larger(&self) -> (GSP, Option<Direction>) {
+        let Delta {dx, dy} = self.path_delta();
+        let ix = ((dx as f32) / 7.0).round() as i32;
+        let iy = ((dy as f32) / 7.0).round() as i32;
+        let d = Delta {dx: dx - (ix*7), dy: dy - (iy*7)};
+        let mut ret_dir = None;
+        if d != (Delta {dx: 0, dy: 0}) {
+            let mut ref_d = self.delta();
+            for dir in [Direction::XY, Direction::XZ, Direction::YZ,
+                        Direction::YX, Direction::ZX, Direction::ZY].iter() {
+                if d == ref_d {
+                    ret_dir = Some(*dir);
+                    break;
+                }
+                ref_d = ref_d.rotate(Rotation::CW);
+            }
+            if ret_dir.is_none() { panic!("Invalid delta {:?}", d); }
+        }
+        (GSP {coord: Hex {x: ix, y: iy}, level: self.level+1}, ret_dir)
+    }
 }
 
 #[cfg(test)]

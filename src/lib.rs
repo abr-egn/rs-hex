@@ -31,6 +31,14 @@ impl Add<Hex> for Delta {
     }
 }
 
+impl Add<Delta> for Delta {
+    type Output = Delta;
+
+    fn add(self, Delta {dx, dy}: Delta) -> Delta {
+        Delta {dx: self.dx+dx, dy: self.dy+dy}
+    }
+}
+
 impl Sub for Hex {
     type Output = Delta; 
 
