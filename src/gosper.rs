@@ -1,5 +1,6 @@
 use super::{Hex, Delta, Direction, Rotation, Iter, ORIGIN};
 
+use std::collections::HashMap;
 use std::ops::Div;
 
 /// The delta from the center of one group to the next at the given zoom level.
@@ -58,19 +59,14 @@ pub struct GSP { pub coord: Hex, pub level: u32 }
 
 fn fold_path(xy: Delta, h: Hex) -> Delta {
     // TODO: use std::iter::iterate when it's stable
-    let xz = xy.rotate(Rotation::CW);
-    let yz = xz.rotate(Rotation::CW);
-    let yx = yz.rotate(Rotation::CW);
-    let zx = yx.rotate(Rotation::CW);
-    let zy = zx.rotate(Rotation::CW);
-    let dir_delta = |dir| match dir {
-        Direction::XY   => xy,
-        Direction::XZ   => xz,
-        Direction::YZ   => yz,
-        Direction::YX   => yx,
-        Direction::ZX   => zx,
-        Direction::ZY   => zy,
-    };
+    let mut delta = xy;
+    let mut deltas: HashMap<Direction, Delta> = HashMap::new();
+    for dir in [Direction::XY, Direction::XZ, Direction::YZ,
+                Direction::YX, Direction::ZX, Direction::ZY].iter() {
+        deltas.insert(*dir, delta.clone());
+        delta = delta.rotate(Rotation::CW);
+    }
+    let dir_delta = |dir| *deltas.get(&dir).unwrap();
     let steps = h.path();
     let trans = steps.into_iter().map(|(d, m)| dir_delta(d) * (m as i32));
     // TODO: use sum() when std::num::Zero is stable
@@ -129,11 +125,12 @@ mod tests {
     extern crate quickcheck;
     extern crate rand;
 
-    use super::{Island};
+    use super::{Island, GSP};
 
     use self::quickcheck::quickcheck;
 
     use std::collections::HashSet;
+    use std::fmt::Debug;
 
     impl quickcheck::Arbitrary for Island {
         fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
@@ -167,5 +164,38 @@ mod tests {
             hs.len() == (7 as usize).pow(i.level)
         }
         quickcheck(prop as fn(Island) -> bool);
+    }
+
+    fn check_eq<A, B>(a: A, b: B) -> Result<bool, String>
+        where A: PartialEq<B> + Debug, B: Debug {
+        if a == b { Ok(true) } else { Err(format!("{:?} != {:?}", a, b)) }
+    }
+
+    impl quickcheck::Arbitrary for GSP {
+        fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
+            let coord = quickcheck::Arbitrary::arbitrary(g);
+            let level = g.gen_range(0, 5);
+            GSP { coord: coord, level: level }
+        }
+        fn shrink(&self) -> Box<Iterator<Item=GSP>> {
+            let level = self.level;
+            let shrink_coord = self.coord.shrink().map(move |h| GSP {coord: h, level: level});
+            if level == 0 {
+                Box::new(shrink_coord)
+            } else {
+                Box::new(Some(GSP {coord: self.coord, level: self.level-1}).into_iter().chain(shrink_coord))
+            }
+        }
+    }
+
+    fn to_zero(g: GSP) -> GSP {
+        if g.level == 0 { g } else { g.smaller().unwrap() }
+    }
+
+    // The center of the island from absolute() is the same as the coord when shrunk to zero.
+    #[test]
+    fn gsp_minimal() {
+        fn prop(g: GSP) -> Result<bool, String> { check_eq(g.absolute().center, to_zero(g).coord) }
+        quickcheck(prop as fn(GSP) -> Result<bool, String>);
     }
 }  // mod tests
