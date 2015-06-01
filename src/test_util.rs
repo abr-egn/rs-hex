@@ -94,3 +94,20 @@ impl quickcheck::Arbitrary for SmallNonNegativeInt {
         }
     }
 }
+
+#[macro_export]
+macro_rules! check_eq {
+    ($left:expr, $right:expr) => ({
+        match (&($left), &($right)) {
+            (left_val, right_val) => {
+                if *left_val == *right_val {
+                    Ok(true)
+                } else {
+                    Err(format!("{} != {} ({:?} != {:?})",
+                                stringify!($left), stringify!($right),
+                                *left_val, *right_val))
+                }
+            }
+        }
+    })
+}

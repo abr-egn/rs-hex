@@ -83,6 +83,10 @@ impl GSP {
         where F: Fn(&Hex) -> Hex {
         GSP {coord: f(&self.coord), level: self.level}
     }
+    pub fn apply<F>(&mut self, f: F)
+        where F: Fn(&mut Hex) {
+        f(&mut self.coord)
+    }
 
     pub fn absolute(&self) -> Island {
         if self.level == 0 {
@@ -137,7 +141,6 @@ mod tests {
     use self::quickcheck::quickcheck;
 
     use std::collections::HashSet;
-    use std::fmt::Debug;
 
     impl quickcheck::Arbitrary for Island {
         fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
@@ -173,11 +176,6 @@ mod tests {
         quickcheck(prop as fn(Island) -> bool);
     }
 
-    fn check_eq<A, B>(a: A, b: B) -> Result<bool, String>
-        where A: PartialEq<B> + Debug, B: Debug {
-        if a == b { Ok(true) } else { Err(format!("{:?} != {:?}", a, b)) }
-    }
-
     impl quickcheck::Arbitrary for GSP {
         fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
             let coord = quickcheck::Arbitrary::arbitrary(g);
@@ -202,7 +200,7 @@ mod tests {
     // The center of the island from absolute() is the same as the coord when shrunk to zero.
     #[test]
     fn gsp_minimal() {
-        fn prop(g: GSP) -> Result<bool, String> { check_eq(g.absolute().center, to_zero(g).coord) }
+        fn prop(g: GSP) -> Result<bool, String> { check_eq!(g.absolute().center, to_zero(g).coord) }
         quickcheck(prop as fn(GSP) -> Result<bool, String>);
     }
 

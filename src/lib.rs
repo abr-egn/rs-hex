@@ -1,6 +1,8 @@
-pub mod gosper;
 #[cfg(test)]
+#[macro_use]
 mod test_util;
+
+pub mod gosper;
 
 use std::cmp;
 use std::ops::{Add,Sub,Mul};
