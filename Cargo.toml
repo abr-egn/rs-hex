@@ -1,6 +1,6 @@
 [package]
 name = "hex"
-version = "0.0.3"
+version = "0.1.0"
 authors = ["Abraham Egnor <abe.egnor@gmail.com>"]
 
 [dev-dependencies]
