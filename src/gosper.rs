@@ -68,7 +68,8 @@ fn fold_path(xy: Delta, h: Hex) -> Delta {
     }
     let dir_delta = |dir| *deltas.get(&dir).unwrap();
     let steps = h.path();
-    let trans = steps.into_iter().map(|(d, m)| dir_delta(d) * (m as i32));
+    let trans = steps.into_iter()
+                     .map(|(d, m)| dir_delta(d) * (m as i32));
     // TODO: use sum() when std::num::Zero is stable
     let mut ret = Delta {dx: 0, dy: 0};
     for d in trans {
@@ -189,7 +190,7 @@ mod tests {
     }
 
     fn to_zero(g: GSP) -> GSP {
-        if g.level == 0 { g } else { g.smaller().unwrap() }
+        if g.level == 0 { g } else { to_zero(g.smaller().unwrap()) }
     }
 
     // The center of the island from absolute() is the same as the coord when shrunk to zero.
