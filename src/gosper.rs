@@ -79,6 +79,11 @@ fn fold_path(xy: Delta, h: Hex) -> Delta {
 }
 
 impl GSP {
+    pub fn map<F>(&self, f: F) -> GSP
+        where F: Fn(&Hex) -> Hex {
+        GSP {coord: f(&self.coord), level: self.level}
+    }
+
     pub fn absolute(&self) -> Island {
         if self.level == 0 {
             return Island {center: self.coord, level: 0};
@@ -126,6 +131,7 @@ mod tests {
     extern crate quickcheck;
     extern crate rand;
 
+    use ::Direction;
     use super::{Island, GSP};
 
     use self::quickcheck::quickcheck;
@@ -198,5 +204,30 @@ mod tests {
     fn gsp_minimal() {
         fn prop(g: GSP) -> Result<bool, String> { check_eq(g.absolute().center, to_zero(g).coord) }
         quickcheck(prop as fn(GSP) -> Result<bool, String>);
+    }
+
+    // Smaller followed by larger is identity.
+    #[test]
+    fn gsp_smaller_larger() {
+        fn prop(g: GSP) -> bool {
+            if g.level == 0 { return true; }
+            let s = g.smaller().unwrap();
+            let (l, d) = s.larger();
+            d.is_none() && (l == g)
+        }
+        quickcheck(prop as fn(GSP) -> bool);
+    }
+
+    // Smaller followed by a single move followed by larger is identity.
+    #[test]
+    fn gsp_smaller_move_larger() {
+        fn prop(g: GSP, d: Direction) -> bool {
+            if g.level == 0 { return true; }
+            let g0 = g.smaller().unwrap();
+            let g1 = g0.map(|&h| h + d.delta());
+            let (g2, d2) = g1.larger();
+            (d2.unwrap() == d) && g2 == g
+        }
+        quickcheck(prop as fn(GSP, Direction) -> bool);
     }
 }  // mod tests
