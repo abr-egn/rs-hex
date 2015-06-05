@@ -250,6 +250,32 @@ pub fn hex_ring(radius: u32) -> Iter {
         )
 }
 
+/// A parallelogram defined by two axes, starting at the origin.
+pub fn parallelogram(a1: Axis, a2: Axis,
+                     a1_size: u32, a2_size: u32) -> Iter {
+    assert!(a1 != a2);
+    Box::new(
+        (0..a1_size as i32).flat_map(
+            move |a1_val| (0..a2_size as i32).map(
+                move |a2_val| {
+                    let mut x;
+                    let mut y;
+                    match (a1, a2) {
+                        (Axis::X, Axis::Y) => { x = a1_val; y = a2_val; }
+                        (Axis::X, Axis::Z) => { x = a1_val; y = -x - a2_val; }
+                        (Axis::Y, Axis::X) => { y = a1_val; x = a2_val; }
+                        (Axis::Y, Axis::Z) => { y = a1_val; x = -y - a2_val; }
+                        (Axis::Z, Axis::X) => { x = a2_val; y = -x - a1_val; }
+                        (Axis::Z, Axis::Y) => { y = a2_val; x = -y - a1_val; }
+                        _ => panic!("Invalid axis combination")
+                    }
+                    Hex {x: x, y: y}
+                }
+            )
+        )
+    )
+}
+
 struct FHex { x: f32, y: f32, z: f32 }
 
 impl FHex {
