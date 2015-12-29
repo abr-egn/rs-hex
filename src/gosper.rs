@@ -33,7 +33,7 @@ impl Island {
         let split_offset = offset(self.level-1);
         let side = |n| {
             let mut center = self.center + split_offset;
-            for _ in (0..n) {
+            for _ in 0..n {
                 center = center.rotate_around(self.center, Rotation::CW);
             }
             center

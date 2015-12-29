@@ -258,8 +258,8 @@ pub fn parallelogram(a1: Axis, a2: Axis,
         (0..a1_size as i32).flat_map(
             move |a1_val| (0..a2_size as i32).map(
                 move |a2_val| {
-                    let mut x;
-                    let mut y;
+                    let x;
+                    let y;
                     match (a1, a2) {
                         (Axis::X, Axis::Y) => { x = a1_val; y = a2_val; }
                         (Axis::X, Axis::Z) => { x = a1_val; y = -x - a2_val; }
@@ -459,7 +459,7 @@ mod tests {
     fn rotate_identity() {
         fn prop(h1: Hex, h2: Hex, r: Rotation) -> bool {
             let mut h = h1;
-            for _ in (0..6) {
+            for _ in 0..6 {
                 h = h.rotate_around(h2, r);
             }
             h == h1
@@ -472,7 +472,7 @@ mod tests {
     fn rotate_delta_identity() {
         fn prop(d0: Delta, r: Rotation) -> bool {
             let mut d = d0;
-            for _ in (0..6) {
+            for _ in 0..6 {
                 d = d.rotate(r);
             }
             d == d0
