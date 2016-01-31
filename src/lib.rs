@@ -148,6 +148,52 @@ impl Hex {
         let axis_mag = minor.1.abs() as u32;
         vec![(axis_dir.unwrap(), axis_mag), (align_dir.unwrap(), align_mag)]
     }
+    /// A hexagonal area of cells of given radius centered on this hex.
+    ///
+    /// A zero-radius area is a single hex.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use hex::ORIGIN;
+    /// assert_eq!(ORIGIN.area(0).count(), 1);
+    /// assert_eq!(ORIGIN.area(1).count(), 7);
+    /// ```
+    pub fn area(&self, radius: u32) -> Iter {
+        let irad = radius as i32;
+        let copy = *self;
+        Box::new(
+            (-irad..irad+1).flat_map(move |q| {
+                let r1 = cmp::max(-irad, -q - irad);
+                let r2 = cmp::min(irad, -q + irad);
+                (r1..r2+1).map(move |r| Hex{x:copy.x+q, y:copy.y+r})
+            })
+        )
+    }
+    /// A hexagonal ring of cells of given radius centered on this hex.
+    ///
+    /// A zero-radius ring is a single hex.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use hex::ORIGIN;
+    /// assert_eq!(ORIGIN.ring(0).count(), 1);
+    /// assert_eq!(ORIGIN.ring(1).count(), 6);
+    /// ```
+    pub fn ring(&self, radius: u32) -> Iter {
+        let copy = *self;
+        if radius == 0 {
+            return Box::new(Some(copy).into_iter());
+        }
+        Box::new(
+            RING_SIDES.iter()
+            .flat_map(move |&(start, dir)|
+                      (copy + start.delta()*(radius as i32))
+                      .ray(dir)
+                      .take(radius as usize))
+            )
+    }
 }
 
 impl Delta {
@@ -194,29 +240,9 @@ impl Direction {
     }
 }
 
-static DIRECTIONS: [Direction; 6] = [Direction::XY, Direction::XZ, Direction::YZ, Direction::YX, Direction::ZX, Direction::ZY];
+// DIRECTIONS and RING_SIDES are supporting datastructures for Hex::ring
 
-/// A hexagonal area of cells of given radius centered on the origin.
-///
-/// A zero-radius area is a single hex.
-///
-/// # Examples
-///
-/// ```
-/// use hex::hex_area;
-/// assert_eq!(hex_area(0).count(), 1);
-/// assert_eq!(hex_area(1).count(), 7);
-/// ```
-pub fn hex_area(radius: u32) -> Iter {
-    let irad = radius as i32;
-    Box::new(
-        (-irad..irad+1).flat_map(move |q| {
-            let r1 = cmp::max(-irad, -q - irad);
-            let r2 = cmp::min(irad, -q + irad);
-            (r1..r2+1).map(move |r| Hex{x:q, y:r})
-        })
-    )
-}
+static DIRECTIONS: [Direction; 6] = [Direction::XY, Direction::XZ, Direction::YZ, Direction::YX, Direction::ZX, Direction::ZY];
 
 static RING_SIDES: [(Direction, Direction); 6] =
     [(Direction::XY, Direction::YZ),
@@ -225,30 +251,6 @@ static RING_SIDES: [(Direction, Direction); 6] =
      (Direction::YX, Direction::ZY),
      (Direction::ZX, Direction::XY),
      (Direction::ZY, Direction::XZ)];
-
-/// A hexagonal ring of cells of given radius centered on the origin.
-///
-/// A zero-radius ring is a single hex.
-///
-/// # Examples
-///
-/// ```
-/// use hex::hex_ring;
-/// assert_eq!(hex_ring(0).count(), 1);
-/// assert_eq!(hex_ring(1).count(), 6);
-/// ```
-pub fn hex_ring(radius: u32) -> Iter {
-    if radius == 0 {
-        return Box::new(Some(ORIGIN).into_iter());
-    }
-    Box::new(
-        RING_SIDES.iter()
-        .flat_map(move |&(start, dir)|
-                  (ORIGIN + start.delta()*(radius as i32))
-                  .ray(dir)
-                  .take(radius as usize))
-        )
-}
 
 /// A parallelogram defined by two axes, starting at the origin.
 pub fn parallelogram(a1: Axis, a2: Axis,
@@ -333,7 +335,7 @@ mod tests {
     extern crate quickcheck;
     extern crate rand;
 
-    use super::{Hex, Delta, Direction, Rotation, Axis, hex_ring, hex_area, ORIGIN};
+    use super::{Hex, Delta, Direction, Rotation, Axis, ORIGIN};
     use super::test_util::{SmallPositiveInt, SmallNonNegativeInt};
 
     use std::collections::HashSet;
@@ -493,39 +495,39 @@ mod tests {
 
     // Number of hexes in a hex ring matches the expected function of radius.
     #[test]
-    fn hex_ring_len() {
+    fn ring_len() {
         fn expected(r: u32) -> usize {
             match r {
                 0 => 1,
                 x => (x as usize)*6,
             }
         }
-        fn prop(r: SmallNonNegativeInt) -> bool { hex_ring(*r).count() == expected(*r) }
-        quickcheck(prop as fn(SmallNonNegativeInt) -> bool);
+        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool { h.ring(*r).count() == expected(*r) }
+        quickcheck(prop as fn(Hex, SmallNonNegativeInt) -> bool);
     }
 
     // The distance from hexes in a hex ring to the origin is the radius of the ring.
     #[test]
-    fn hex_ring_distance() {
-        fn prop(r: SmallNonNegativeInt) -> bool {
-            hex_ring(*r).all(|h| { ORIGIN.distance_to(h) == *r })
+    fn ring_distance() {
+        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool {
+            h.ring(*r).all(|h2| { h.distance_to(h2) == *r })
         }
-        quickcheck(prop as fn(SmallNonNegativeInt) -> bool);
+        quickcheck(prop as fn(Hex, SmallNonNegativeInt) -> bool);
     }
 
     // Number of hexes in a hex area matches the expected function of radius.
     #[test]
-    fn hex_area_len() {
+    fn area_len() {
         fn expected(r: u32) -> usize { (3*r.pow(2) + 3*r + 1) as usize }
-        fn prop(r: SmallNonNegativeInt) -> bool { hex_area(*r).count() == expected(*r) }
-        quickcheck(prop as fn(SmallNonNegativeInt) -> bool);
+        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool { h.area(*r).count() == expected(*r) }
+        quickcheck(prop as fn(Hex, SmallNonNegativeInt) -> bool);
     }
 
     // The distance from hexes in a hex area to the origin is <= the radius of the area.
     #[test]
-    fn hex_area_distance() {
-        fn prop(r: SmallNonNegativeInt) -> bool { hex_area(*r).all(|h| ORIGIN.distance_to(h) <= *r) }
-        quickcheck(prop as fn(SmallNonNegativeInt) -> bool);
+    fn area_distance() {
+        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool { h.area(*r).all(|h2| h.distance_to(h2) <= *r) }
+        quickcheck(prop as fn(Hex, SmallNonNegativeInt) -> bool);
     }
 
 }  // mod tests
