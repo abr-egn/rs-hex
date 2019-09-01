@@ -2,6 +2,7 @@
 name = "hex"
 version = "0.2.0"
 authors = ["Abraham Egnor <abe.egnor@gmail.com>"]
+edition = "2018"
 
 [dev-dependencies]
 quickcheck = "0.2.0"
