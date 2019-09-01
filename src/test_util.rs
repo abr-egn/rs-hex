@@ -11,7 +11,7 @@ impl quickcheck::Arbitrary for Hex {
         let y = g.gen_range(-1000, 1000);
         Hex {x: x, y: y}
     }
-    fn shrink(&self) -> Box<Iterator<Item=Hex>> {
+    fn shrink(&self) -> Box<dyn Iterator<Item=Hex>> {
         let xy = (self.x, self.y).shrink();
         let out = xy.map(|(x, y)| Hex {x: x, y: y});
         Box::new(out)
@@ -23,7 +23,7 @@ impl quickcheck::Arbitrary for Delta {
         let Hex {x, y} = quickcheck::Arbitrary::arbitrary(g);
         Delta {dx: x, dy: y}
     }
-    fn shrink(&self) -> Box<Iterator<Item=Delta>> {
+    fn shrink(&self) -> Box<dyn Iterator<Item=Delta>> {
         Box::new(Hex {x: self.dx, y: self.dy}.shrink().map(|Hex {x, y}| Delta {dx: x, dy: y}))
     }
 }
@@ -63,7 +63,7 @@ impl quickcheck::Arbitrary for SmallPositiveInt {
     fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
         SmallPositiveInt(g.gen_range(1, 100))
     }
-    fn shrink(&self) -> Box<Iterator<Item=SmallPositiveInt>> {
+    fn shrink(&self) -> Box<dyn Iterator<Item=SmallPositiveInt>> {
         match **self {
             1 => quickcheck::empty_shrinker(),
             n => quickcheck::single_shrinker(SmallPositiveInt(n/2))
@@ -86,7 +86,7 @@ impl quickcheck::Arbitrary for SmallNonNegativeInt {
     fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
         SmallNonNegativeInt(g.gen_range(0, 100))
     }
-    fn shrink(&self) -> Box<Iterator<Item=SmallNonNegativeInt>> {
+    fn shrink(&self) -> Box<dyn Iterator<Item=SmallNonNegativeInt>> {
         match **self {
             0 => quickcheck::empty_shrinker(),
             1 => quickcheck::single_shrinker(SmallNonNegativeInt(0)),

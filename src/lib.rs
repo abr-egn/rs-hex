@@ -65,8 +65,8 @@ impl Mul<Delta> for i32 {
     }
 }
 
-pub type Iter = Box<Iterator<Item=Hex> + 'static>;
-pub type IterSize = Box<ExactSizeIterator<Item=Hex> + 'static>;
+pub type Iter = Box<dyn Iterator<Item=Hex> + 'static>;
+pub type IterSize = Box<dyn ExactSizeIterator<Item=Hex> + 'static>;
 
 impl Hex {
     pub fn x(&self) -> i32 { self.x }

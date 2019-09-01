@@ -135,7 +135,7 @@ mod tests {
     extern crate quickcheck;
     extern crate rand;
 
-    use ::Direction;
+    use crate::Direction;
     use super::{Island, GSP};
 
     use self::quickcheck::quickcheck;
@@ -148,7 +148,7 @@ mod tests {
             let level = g.gen_range(0, 5);
             Island {center: center, level: level}
         }
-        fn shrink(&self) -> Box<Iterator<Item=Island>> {
+        fn shrink(&self) -> Box<dyn Iterator<Item=Island>> {
             let level = self.level;
             let shrink_center = self.center.shrink().map(move |h| Island {center: h, level: level});
             if level == 0 {
@@ -182,7 +182,7 @@ mod tests {
             let level = g.gen_range(0, 5);
             GSP { coord: coord, level: level }
         }
-        fn shrink(&self) -> Box<Iterator<Item=GSP>> {
+        fn shrink(&self) -> Box<dyn Iterator<Item=GSP>> {
             let level = self.level;
             let shrink_coord = self.coord.shrink().map(move |h| GSP {coord: h, level: level});
             if level == 0 {
