@@ -1,6 +1,3 @@
-extern crate quickcheck;
-extern crate rand;
-
 use super::{Hex, Delta, Direction, Rotation};
 
 use std::ops::Deref;

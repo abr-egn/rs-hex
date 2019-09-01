@@ -132,15 +132,12 @@ impl GSP {
 
 #[cfg(test)]
 mod tests {
-    extern crate quickcheck;
-    extern crate rand;
-
     use crate::Direction;
     use super::{Island, GSP};
 
-    use self::quickcheck::quickcheck;
-
     use std::collections::HashSet;
+
+    use quickcheck::quickcheck;
 
     impl quickcheck::Arbitrary for Island {
         fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {

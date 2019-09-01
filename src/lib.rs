@@ -331,17 +331,13 @@ impl Axis {
 
 #[cfg(test)]
 mod tests {
-
-    extern crate quickcheck;
-    extern crate rand;
-
     use super::{Hex, Delta, Direction, Rotation, Axis, ORIGIN};
     use super::test_util::{SmallPositiveInt, SmallNonNegativeInt};
 
     use std::collections::HashSet;
     use std::collections::HashMap;
 
-    use self::quickcheck::quickcheck;
+    use quickcheck::quickcheck;
 
     // A hex has six neighbors.
     #[test]
