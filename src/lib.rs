@@ -66,10 +66,13 @@ impl<S: Clone, D: Mul<S>> Mul<Delta<D>> for S {
 }
 */
 
-impl Hex {
-    pub fn x(&self) -> i32 { self.x }
-    pub fn y(&self) -> i32 { self.y }
-    pub fn z(&self) -> i32 { 0 - (self.x + self.y) }
+impl<T> Hex<T> {
+    pub fn x(self) -> T { self.x }
+    pub fn y(self) -> T { self.y }
+    pub fn z<O>(self) -> <O as std::ops::Neg>::Output
+        where T: Add<Output=O>,
+              O: std::ops::Neg,
+    { - (self.x + self.y) }
     /// The distance to the other hex as a straight-line path.
     ///
     /// # Examples
@@ -81,7 +84,12 @@ impl Hex {
     /// assert_eq!(ORIGIN.distance_to(Hex{x:1,y:1}), 2);
     /// assert_eq!(ORIGIN.distance_to(Hex{x:1,y:2}), 3);
     /// ```
-    pub fn distance_to(&self, other: Hex) -> u32 { (*self - other).length() }
+    pub fn distance_to<R>(self, other: Hex<R>) -> u32
+        where Self: Sub<Hex<R>>,
+    { (self - other).length() }
+}
+
+impl Hex {
     /// A sequence of hexes along the given direction, not including `self`.
     ///
     /// # Examples
@@ -189,10 +197,13 @@ impl Hex {
     }
 }
 
-impl Delta {
-    pub fn dx(&self) -> i32 { self.dx }
-    pub fn dy(&self) -> i32 { self.dy }
-    pub fn dz(&self) -> i32 { 0 - (self.dx + self.dy) }
+impl<T> Delta<T> {
+    pub fn dx(self) -> T { self.dx }
+    pub fn dy(self) -> T { self.dy }
+    pub fn dz<O>(self) -> <O as std::ops::Neg>::Output
+        where T: Add<Output=O>,
+              O: std::ops::Neg,
+    { - (self.dx + self.dy) }
     /// The length of this translation, i.e. the number of hexes a line of this length would have.
     ///
     /// # Examples
@@ -202,7 +213,10 @@ impl Delta {
     /// assert_eq!(Delta{dx:0,dy:0}.length(), 0);
     /// assert_eq!(Delta{dx:1,dy:2}.length(), 3);
     /// ```
-    pub fn length(&self) -> u32 { ((self.dx().abs() + self.dy().abs() + self.dz().abs()) / 2) as u32 }
+    pub fn length(self) -> u32 { ((self.dx().abs() + self.dy().abs() + self.dz().abs()) / 2) as u32 }
+}
+
+impl Delta {
     /// Rotate this delta.
     pub fn rotate(&self, dir: Rotation) -> Delta {
         match dir {
