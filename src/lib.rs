@@ -443,7 +443,7 @@ mod tests {
     fn ray_delta() {
         fn prop(h: Hex, d: Direction, i: SmallPositiveInt) -> bool {
             let mut prev = h;
-            h.ray(d).take(*i as usize).all(|pt| {
+            h.ray(d).take(i.0 as usize).all(|pt| {
                 let cmp = (pt - prev) == d.delta();
                 prev = pt;
                 cmp
@@ -498,7 +498,7 @@ mod tests {
                 x => (x as usize)*6,
             }
         }
-        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool { h.ring(*r).count() == expected(*r) }
+        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool { h.ring(r.0).count() == expected(r.0) }
         quickcheck(prop as fn(Hex, SmallNonNegativeInt) -> bool);
     }
 
@@ -506,7 +506,7 @@ mod tests {
     #[test]
     fn ring_distance() {
         fn prop(h: Hex, r: SmallNonNegativeInt) -> bool {
-            h.ring(*r).all(|h2| { h.distance_to(h2) == *r })
+            h.ring(r.0).all(|h2| { h.distance_to(h2) == r.0 })
         }
         quickcheck(prop as fn(Hex, SmallNonNegativeInt) -> bool);
     }
@@ -515,14 +515,14 @@ mod tests {
     #[test]
     fn area_len() {
         fn expected(r: u32) -> usize { (3*r.pow(2) + 3*r + 1) as usize }
-        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool { h.area(*r).count() == expected(*r) }
+        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool { h.area(r.0).count() == expected(r.0) }
         quickcheck(prop as fn(Hex, SmallNonNegativeInt) -> bool);
     }
 
     // The distance from hexes in a hex area to the origin is <= the radius of the area.
     #[test]
     fn area_distance() {
-        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool { h.area(*r).all(|h2| h.distance_to(h2) <= *r) }
+        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool { h.area(r.0).all(|h2| h.distance_to(h2) <= r.0) }
         quickcheck(prop as fn(Hex, SmallNonNegativeInt) -> bool);
     }
 

@@ -1,6 +1,5 @@
 use super::{Hex, Delta, Direction, Rotation};
 
-use std::ops::Deref;
 use rand::Rng;
 
 impl quickcheck::Arbitrary for Hex {
@@ -47,22 +46,14 @@ impl quickcheck::Arbitrary for Rotation {
 }
 
 #[derive(Clone, Debug)]
-pub struct SmallPositiveInt(u32);
-
-impl Deref for SmallPositiveInt {
-    type Target = u32;
-    fn deref<'a>(&'a self) -> &'a u32 {
-        let SmallPositiveInt(ref val) = *self;
-        val
-    }
-}
+pub struct SmallPositiveInt(pub u32);
 
 impl quickcheck::Arbitrary for SmallPositiveInt {
     fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
         SmallPositiveInt(g.gen_range(1, 100))
     }
     fn shrink(&self) -> Box<dyn Iterator<Item=SmallPositiveInt>> {
-        match **self {
+        match self.0 {
             1 => quickcheck::empty_shrinker(),
             n => quickcheck::single_shrinker(SmallPositiveInt(n/2))
         }
@@ -70,22 +61,14 @@ impl quickcheck::Arbitrary for SmallPositiveInt {
 }
 
 #[derive(Clone, Debug)]
-pub struct SmallNonNegativeInt(u32);
-
-impl Deref for SmallNonNegativeInt {
-    type Target = u32;
-    fn deref<'a>(&'a self) -> &'a u32 {
-        let SmallNonNegativeInt(ref val) = *self;
-        val
-    }
-}
+pub struct SmallNonNegativeInt(pub u32);
 
 impl quickcheck::Arbitrary for SmallNonNegativeInt {
     fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
         SmallNonNegativeInt(g.gen_range(0, 100))
     }
     fn shrink(&self) -> Box<dyn Iterator<Item=SmallNonNegativeInt>> {
-        match **self {
+        match self.0 {
             0 => quickcheck::empty_shrinker(),
             1 => quickcheck::single_shrinker(SmallNonNegativeInt(0)),
             n => quickcheck::single_shrinker(SmallNonNegativeInt(n/2)),
