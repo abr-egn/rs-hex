@@ -13,11 +13,12 @@ use std::ops::Div;
 pub fn offset(level: u32) -> Delta {
     let increment = level.div(2);
     let scale = (7 as i32).pow(increment);
-    scale * if level % 2 == 0 {
+    let delta = if level % 2 == 0 {
         Direction::XY.delta()
     } else {
         Delta {dx: 2, dy: -3}
-    }
+    };
+    delta * scale
 }
 
 /// A Gosper island with a given center and zoom level.

@@ -8,61 +8,63 @@ use std::ops::{Add,Sub,Mul};
 
 /// A hex-grid coordinate, using cubic notation.
 #[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash)]
-pub struct Hex { pub x: i32, pub y: i32 }
+pub struct Hex<T = i32> { pub x: T, pub y: T }
 
 /// The difference between two `Hex` coordinates.
 #[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash)]
-pub struct Delta { pub dx: i32, pub dy: i32 }
+pub struct Delta<T = i32> { pub dx: T, pub dy: T }
 
 pub static ORIGIN: Hex = Hex {x: 0, y: 0};
 
-impl Add<Delta> for Hex {
-    type Output = Hex;
+impl<D, H: Add<D>> Add<Delta<D>> for Hex<H> {
+    type Output = Hex<<H as Add<D>>::Output>;
 
-    fn add(self, Delta {dx, dy}: Delta) -> Hex {
+    fn add(self, Delta {dx, dy}: Delta<D>) -> Self::Output {
         Hex {x: self.x+dx, y: self.y+dy}
     }
 }
 
-impl Add<Hex> for Delta {
-    type Output = Hex;
+impl<H, D: Add<H>> Add<Hex<H>> for Delta<D> {
+    type Output = Hex<<D as Add<H>>::Output>;
 
-    fn add(self, Hex {x, y}: Hex) -> Hex {
-        Hex {x: x+self.dx, y: y+self.dy}
+    fn add(self, Hex {x, y}: Hex<H>) -> Self::Output {
+        Hex {x: self.dx+x, y: self.dy+y}
     }
 }
 
-impl Add<Delta> for Delta {
-    type Output = Delta;
+impl<R, L: Add<R>> Add<Delta<R>> for Delta<L> {
+    type Output = Delta<<L as Add<R>>::Output>;
 
-    fn add(self, Delta {dx, dy}: Delta) -> Delta {
+    fn add(self, Delta {dx, dy}: Delta<R>) -> Self::Output {
         Delta {dx: self.dx+dx, dy: self.dy+dy}
     }
 }
 
-impl Sub for Hex {
-    type Output = Delta; 
+impl<R, L: Sub<R>> Sub<Hex<R>> for Hex<L> {
+    type Output = Delta<<L as Sub<R>>::Output>;
 
-    fn sub(self, Hex {x, y}: Hex) -> Delta {
+    fn sub(self, Hex {x, y}: Hex<R>) -> Self::Output {
         Delta {dx: self.x-x, dy: self.y-y}
     }
 }
 
-impl Mul<i32> for Delta {
-    type Output = Delta;
+impl<S: Clone, D: Mul<S>> Mul<S> for Delta<D> {
+    type Output = Delta<<D as Mul<S>>::Output>;
 
-    fn mul(self, f: i32) -> Delta {
-        Delta {dx: self.dx*f, dy: self.dy*f}
+    fn mul(self, f: S) -> Self::Output {
+        Delta {dx: self.dx*f.clone(), dy: self.dy*f}
     }
 }
 
-impl Mul<Delta> for i32 {
-    type Output = Delta;
+/* Conflicts with the other Mul because Delta<D> and S could overlap
+impl<S: Clone, D: Mul<S>> Mul<Delta<D>> for S {
+    type Output = Delta<<D as Mul<S>>::Output>;
 
-    fn mul(self, Delta {dx, dy}: Delta) -> Delta {
-        Delta {dx: self*dx, dy: self*dy}
+    fn mul(self, Delta {dx, dy}: Delta<D>) -> Self::Output {
+        Delta {dx: self.clone()*dx, dy: self*dy}
     }
 }
+*/
 
 impl Hex {
     pub fn x(&self) -> i32 { self.x }
