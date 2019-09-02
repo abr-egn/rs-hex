@@ -64,9 +64,6 @@ impl Mul<Delta> for i32 {
     }
 }
 
-pub type Iter = Box<dyn Iterator<Item=Hex> + 'static>;
-pub type IterSize = Box<dyn ExactSizeIterator<Item=Hex> + 'static>;
-
 impl Hex {
     pub fn x(&self) -> i32 { self.x }
     pub fn y(&self) -> i32 { self.y }
@@ -91,11 +88,9 @@ impl Hex {
     /// use hex::{Hex, Direction, ORIGIN};
     /// assert_eq!(ORIGIN.ray(Direction::XY).nth(4).unwrap(), Hex {x:5,y:-5});
     /// ```
-    pub fn ray(&self, dir: Direction) -> Iter {
+    pub fn ray(&self, dir: Direction) -> impl Iterator<Item=Hex> {
         let h = *self;
-        Box::new(
-            (1..).map(move |d| h + dir.delta()*d)
-            )
+        (1..).map(move |d| h + dir.delta()*d)
     }
     /// The six neighbor coordinates.
     ///
@@ -105,7 +100,7 @@ impl Hex {
     /// use hex::{Hex, ORIGIN};
     /// assert!(ORIGIN.neighbors().all(|h| ORIGIN.distance_to(h) == 1));
     /// ```
-    pub fn neighbors(&self) -> IterSize {
+    pub fn neighbors(&self) -> impl ExactSizeIterator<Item=Hex> {
         let h = *self;
         Box::new(
             Direction::all().map(move |d| h + d.delta())
@@ -120,11 +115,11 @@ impl Hex {
     /// let h = Hex{x:1,y:2};
     /// assert_eq!(ORIGIN.line_to(h).last().unwrap(), h);
     /// ```
-    pub fn line_to(&self, other: Hex) -> Iter {
+    pub fn line_to(&self, other: Hex) -> impl Iterator<Item=Hex> {
         let copy = *self;
         let n = copy.distance_to(other);
         let step = 1.0 / cmp::max(n, 1) as f32;
-        Box::new((0..n+1).map(move |i| hex_lerp(copy, other, step*(i as f32)).round()))
+        (0..n+1).map(move |i| hex_lerp(copy, other, step*(i as f32)).round())
     }
     /// Rotate this hex clockwise or counter-clockwise around another center hex.
     pub fn rotate_around(&self, center: Hex, dir: Rotation) -> Hex {
@@ -158,16 +153,14 @@ impl Hex {
     /// assert_eq!(ORIGIN.area(0).count(), 1);
     /// assert_eq!(ORIGIN.area(1).count(), 7);
     /// ```
-    pub fn area(&self, radius: u32) -> Iter {
+    pub fn area(&self, radius: u32) -> impl Iterator<Item=Hex> {
         let irad = radius as i32;
         let copy = *self;
-        Box::new(
-            (-irad..irad+1).flat_map(move |q| {
-                let r1 = cmp::max(-irad, -q - irad);
-                let r2 = cmp::min(irad, -q + irad);
-                (r1..r2+1).map(move |r| Hex{x:copy.x+q, y:copy.y+r})
-            })
-        )
+        (-irad..irad+1).flat_map(move |q| {
+            let r1 = cmp::max(-irad, -q - irad);
+            let r2 = cmp::min(irad, -q + irad);
+            (r1..r2+1).map(move |r| Hex{x:copy.x+q, y:copy.y+r})
+        })
     }
     /// A hexagonal ring of cells of given radius centered on this hex.
     ///
@@ -180,18 +173,17 @@ impl Hex {
     /// assert_eq!(ORIGIN.ring(0).count(), 1);
     /// assert_eq!(ORIGIN.ring(1).count(), 6);
     /// ```
-    pub fn ring(&self, radius: u32) -> Iter {
+    pub fn ring(&self, radius: u32) -> Box<dyn Iterator<Item=Hex>> {
         let copy = *self;
         if radius == 0 {
             return Box::new(Some(copy).into_iter());
         }
-        Box::new(
-            RING_SIDES.iter()
-            .flat_map(move |&(start, dir)|
-                      (copy + start.delta()*(radius as i32))
-                      .ray(dir)
-                      .take(radius as usize))
-            )
+        Box::new(RING_SIDES.iter()
+            .flat_map(move |&(start, dir)| {
+                (copy + start.delta()*(radius as i32))
+                    .ray(dir)
+                    .take(radius as usize)
+            }))
     }
 }
 
@@ -253,26 +245,24 @@ static RING_SIDES: [(Direction, Direction); 6] =
 
 /// A parallelogram defined by two axes, starting at the origin.
 pub fn parallelogram(a1: Axis, a2: Axis,
-                     a1_size: u32, a2_size: u32) -> Iter {
+                     a1_size: u32, a2_size: u32) -> impl Iterator<Item=Hex> {
     assert!(a1 != a2);
-    Box::new(
-        (0..a1_size as i32).flat_map(
-            move |a1_val| (0..a2_size as i32).map(
-                move |a2_val| {
-                    let x;
-                    let y;
-                    match (a1, a2) {
-                        (Axis::X, Axis::Y) => { x = a1_val; y = a2_val; }
-                        (Axis::X, Axis::Z) => { x = a1_val; y = -x - a2_val; }
-                        (Axis::Y, Axis::X) => { y = a1_val; x = a2_val; }
-                        (Axis::Y, Axis::Z) => { y = a1_val; x = -y - a2_val; }
-                        (Axis::Z, Axis::X) => { x = a2_val; y = -x - a1_val; }
-                        (Axis::Z, Axis::Y) => { y = a2_val; x = -y - a1_val; }
-                        _ => panic!("Invalid axis combination")
-                    }
-                    Hex {x: x, y: y}
+    (0..a1_size as i32).flat_map(
+        move |a1_val| (0..a2_size as i32).map(
+            move |a2_val| {
+                let x;
+                let y;
+                match (a1, a2) {
+                    (Axis::X, Axis::Y) => { x = a1_val; y = a2_val; }
+                    (Axis::X, Axis::Z) => { x = a1_val; y = -x - a2_val; }
+                    (Axis::Y, Axis::X) => { y = a1_val; x = a2_val; }
+                    (Axis::Y, Axis::Z) => { y = a1_val; x = -y - a2_val; }
+                    (Axis::Z, Axis::X) => { x = a2_val; y = -x - a1_val; }
+                    (Axis::Z, Axis::Y) => { y = a2_val; x = -y - a1_val; }
+                    _ => panic!("Invalid axis combination")
                 }
-            )
+                Hex {x: x, y: y}
+            }
         )
     )
 }

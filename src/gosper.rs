@@ -1,4 +1,4 @@
-use super::{Hex, Delta, Direction, Rotation, Iter, ORIGIN};
+use super::{Hex, Delta, Direction, Rotation, ORIGIN};
 
 use std::collections::HashMap;
 use std::ops::Div;
@@ -44,7 +44,7 @@ impl Island {
         Some((middle, side_dirs.into_iter().zip(sides).collect()))
     }
 
-    pub fn hexes(&self) -> Iter {
+    pub fn hexes(&self) -> Box<dyn Iterator<Item=Hex>> {
         if self.level == 0 {
             return Box::new(Some(self.center).into_iter());
         }
