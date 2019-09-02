@@ -1,6 +1,7 @@
 use super::{Hex, Delta, Direction, Rotation};
 
 use std::ops::Deref;
+use rand::Rng;
 
 impl quickcheck::Arbitrary for Hex {
     fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {

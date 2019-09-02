@@ -138,6 +138,7 @@ mod tests {
     use std::collections::HashSet;
 
     use quickcheck::quickcheck;
+    use rand::Rng;
 
     impl quickcheck::Arbitrary for Island {
         fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> Self {
