@@ -1,5 +1,4 @@
 #[cfg(test)]
-#[macro_use]
 mod test_util;
 
 pub mod gosper;

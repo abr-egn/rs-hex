@@ -1,5 +1,7 @@
 use super::{Hex, Delta, Direction, Rotation};
 
+use std::cmp::PartialEq;
+use std::fmt::Debug;
 use rand::Rng;
 
 impl quickcheck::Arbitrary for Hex {
@@ -76,19 +78,14 @@ impl quickcheck::Arbitrary for SmallNonNegativeInt {
     }
 }
 
-#[macro_export]
-macro_rules! check_eq {
-    ($left:expr, $right:expr) => ({
-        match (&($left), &($right)) {
-            (left_val, right_val) => {
-                if *left_val == *right_val {
-                    Ok(true)
-                } else {
-                    Err(format!("{} != {} ({:?} != {:?})",
-                                stringify!($left), stringify!($right),
-                                *left_val, *right_val))
-                }
-            }
-        }
-    })
+pub fn check_eq<A, B>(left: A, right: B) -> Result<bool, String>
+    where A: PartialEq<B>,
+          A: Debug,
+          B: Debug,
+    {
+    if left == right {
+        Ok(true)
+    } else {
+        Err(format!("{:?} != {:?})", left, right))
+    }
 }

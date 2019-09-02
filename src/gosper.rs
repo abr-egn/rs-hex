@@ -133,6 +133,7 @@ impl GSP {
 #[cfg(test)]
 mod tests {
     use crate::Direction;
+    use crate::test_util::check_eq;
     use super::{Island, GSP};
 
     use std::collections::HashSet;
@@ -198,7 +199,7 @@ mod tests {
     // The center of the island from absolute() is the same as the coord when shrunk to zero.
     #[test]
     fn gsp_minimal() {
-        fn prop(g: GSP) -> Result<bool, String> { check_eq!(g.absolute().center, to_zero(g).coord) }
+        fn prop(g: GSP) -> Result<bool, String> { check_eq(g.absolute().center, to_zero(g).coord) }
         quickcheck(prop as fn(GSP) -> Result<bool, String>);
     }
 
