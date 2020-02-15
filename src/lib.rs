@@ -4,7 +4,9 @@ mod test_util;
 pub mod gosper;
 
 use std::cmp;
-use std::ops::{Add,Sub,Mul};
+use std::ops::{Add,Sub,Mul,RangeFrom};
+
+use num_traits;
 
 /// A hex-grid coordinate, using cubic notation.
 #[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash)]
@@ -16,63 +18,73 @@ pub struct Delta<T = i32> { pub dx: T, pub dy: T }
 
 pub static ORIGIN: Hex = Hex {x: 0, y: 0};
 
-impl<D, H: Add<D>> Add<Delta<D>> for Hex<H> {
-    type Output = Hex<<H as Add<D>>::Output>;
+pub trait HexCoord: Clone + num_traits::Num + num_traits::Signed {
+    fn half(self) -> Self;
+    fn neg_one() -> Self;
+}
 
-    fn add(self, Delta {dx, dy}: Delta<D>) -> Self::Output {
+impl<T> HexCoord for T where T: Clone + num_traits::Num + num_traits::Signed {
+    fn neg_one() -> Self { num_traits::zero::<T>() - num_traits::one() }
+    fn half(self) -> Self {
+        let two = num_traits::one::<T>() + num_traits::one();
+        self / two
+    }
+}
+
+impl<C: HexCoord> Add<Delta<C>> for Hex<C> {
+    type Output = Self;
+
+    fn add(self, Delta {dx, dy}: Delta<C>) -> Self::Output {
         Hex {x: self.x+dx, y: self.y+dy}
     }
 }
 
-impl<H, D: Add<H>> Add<Hex<H>> for Delta<D> {
-    type Output = Hex<<D as Add<H>>::Output>;
+impl<C: HexCoord> Add<Hex<C>> for Delta<C> {
+    type Output = Hex<C>;
 
-    fn add(self, Hex {x, y}: Hex<H>) -> Self::Output {
+    fn add(self, Hex {x, y}: Hex<C>) -> Self::Output {
         Hex {x: self.dx+x, y: self.dy+y}
     }
 }
 
-impl<R, L: Add<R>> Add<Delta<R>> for Delta<L> {
-    type Output = Delta<<L as Add<R>>::Output>;
+impl<C: HexCoord> Add<Delta<C>> for Delta<C> {
+    type Output = Self;
 
-    fn add(self, Delta {dx, dy}: Delta<R>) -> Self::Output {
+    fn add(self, Delta {dx, dy}: Delta<C>) -> Self::Output {
         Delta {dx: self.dx+dx, dy: self.dy+dy}
     }
 }
 
-impl<R, L: Sub<R>> Sub<Hex<R>> for Hex<L> {
-    type Output = Delta<<L as Sub<R>>::Output>;
+impl<C: HexCoord> Sub<Hex<C>> for Hex<C> {
+    type Output = Delta<C>;
 
-    fn sub(self, Hex {x, y}: Hex<R>) -> Self::Output {
+    fn sub(self, Hex {x, y}: Hex<C>) -> Self::Output {
         Delta {dx: self.x-x, dy: self.y-y}
     }
 }
 
-impl<S: Clone, D: Mul<S>> Mul<S> for Delta<D> {
-    type Output = Delta<<D as Mul<S>>::Output>;
+impl<C: HexCoord> Mul<C> for Delta<C> {
+    type Output = Self;
 
-    fn mul(self, f: S) -> Self::Output {
+    fn mul(self, f: C) -> Self::Output {
         Delta {dx: self.dx*f.clone(), dy: self.dy*f}
     }
 }
 
 /* Conflicts with the other Mul because Delta<D> and S could overlap
-impl<S: Clone, D: Mul<S>> Mul<Delta<D>> for S {
-    type Output = Delta<<D as Mul<S>>::Output>;
+impl<C: HexCoord + Clone> Mul<Delta<C>> for C {
+    type Output = Self;
 
-    fn mul(self, Delta {dx, dy}: Delta<D>) -> Self::Output {
+    fn mul(self, Delta {dx, dy}: Delta<C>) -> Self::Output {
         Delta {dx: self.clone()*dx, dy: self*dy}
     }
 }
 */
 
-impl<T> Hex<T> {
-    pub fn x(self) -> T { self.x }
-    pub fn y(self) -> T { self.y }
-    pub fn z<O>(self) -> <O as std::ops::Neg>::Output
-        where T: Add<Output=O>,
-              O: std::ops::Neg,
-    { - (self.x + self.y) }
+impl<C: HexCoord> Hex<C> {
+    pub fn x(self) -> C { self.x }
+    pub fn y(self) -> C { self.y }
+    pub fn z(self) -> C { - (self.x + self.y) }
     /// The distance to the other hex as a straight-line path.
     ///
     /// # Examples
@@ -84,12 +96,8 @@ impl<T> Hex<T> {
     /// assert_eq!(ORIGIN.distance_to(Hex{x:1,y:1}), 2);
     /// assert_eq!(ORIGIN.distance_to(Hex{x:1,y:2}), 3);
     /// ```
-    pub fn distance_to<R>(self, other: Hex<R>) -> u32
-        where Self: Sub<Hex<R>>,
-    { (self - other).length() }
-}
+    pub fn distance_to(self, other: Hex<C>) -> C { (self - other).length() }
 
-impl Hex {
     /// A sequence of hexes along the given direction, not including `self`.
     ///
     /// # Examples
@@ -98,10 +106,16 @@ impl Hex {
     /// use hex::{Hex, Direction, ORIGIN};
     /// assert_eq!(ORIGIN.ray(Direction::XY).nth(4).unwrap(), Hex {x:5,y:-5});
     /// ```
-    pub fn ray(&self, dir: Direction) -> impl Iterator<Item=Hex> {
-        let h = *self;
-        (1..).map(move |d| h + dir.delta()*d)
+    pub fn ray(&self, dir: Direction) -> impl Iterator<Item=Hex<C>>
+        where RangeFrom<C>: Iterator<Item=C>
+    {
+        let h = self.clone();
+        (num_traits::one()..).map(move |d| h.clone() + dir.delta()*d)
     }
+}
+
+// TODO(aegnor): this is for Hex<i32>; make them generic
+impl Hex {
     /// The six neighbor coordinates.
     ///
     /// # Examples
@@ -197,13 +211,10 @@ impl Hex {
     }
 }
 
-impl<T> Delta<T> {
-    pub fn dx(self) -> T { self.dx }
-    pub fn dy(self) -> T { self.dy }
-    pub fn dz<O>(self) -> <O as std::ops::Neg>::Output
-        where T: Add<Output=O>,
-              O: std::ops::Neg,
-    { - (self.dx + self.dy) }
+impl<C: HexCoord> Delta<C> {
+    pub fn dx(&self) -> C { self.dx.clone() }
+    pub fn dy(&self) -> C { self.dy.clone() }
+    pub fn dz(&self) -> C { - (self.dx() + self.dy()) }
     /// The length of this translation, i.e. the number of hexes a line of this length would have.
     ///
     /// # Examples
@@ -213,7 +224,7 @@ impl<T> Delta<T> {
     /// assert_eq!(Delta{dx:0,dy:0}.length(), 0);
     /// assert_eq!(Delta{dx:1,dy:2}.length(), 3);
     /// ```
-    pub fn length(self) -> u32 { ((self.dx().abs() + self.dy().abs() + self.dz().abs()) / 2) as u32 }
+    pub fn length(&self) -> C { (self.dx().abs() + self.dy().abs() + self.dz().abs()).half() }
 }
 
 impl Delta {
@@ -235,14 +246,14 @@ impl Direction {
     /// All `Direction`s, in convenient `Iterator` format.
     pub fn all() -> std::slice::Iter<'static, Direction> { DIRECTIONS.iter() }
     /// Returns the `Delta` corresponding to a single move in this `Direction`.
-    pub fn delta(self) -> Delta {
+    pub fn delta<C: HexCoord>(self) -> Delta<C> {
         match self {
-            Direction::XY => Delta {dx: 1, dy:-1},
-            Direction::XZ => Delta {dx: 1, dy: 0},
-            Direction::YZ => Delta {dx: 0, dy: 1},
-            Direction::YX => Delta {dx:-1, dy: 1},
-            Direction::ZX => Delta {dx:-1, dy: 0},
-            Direction::ZY => Delta {dx: 0, dy:-1},
+            Direction::XY => Delta {dx: num_traits::one(), dy: HexCoord::neg_one()},
+            Direction::XZ => Delta {dx: num_traits::one(), dy: num_traits::zero()},
+            Direction::YZ => Delta {dx: num_traits::zero(), dy: num_traits::one()},
+            Direction::YX => Delta {dx: HexCoord::neg_one(), dy: num_traits::one()},
+            Direction::ZX => Delta {dx: HexCoord::neg_one(), dy: num_traits::zero()},
+            Direction::ZY => Delta {dx: num_traits::zero(), dy: HexCoord::neg_one()},
         }
     }
 }
@@ -341,6 +352,7 @@ mod tests {
 
     use std::collections::HashSet;
     use std::collections::HashMap;
+    use std::convert::TryInto;
 
     use quickcheck::quickcheck;
 
@@ -436,7 +448,7 @@ mod tests {
             let dist = ORIGIN.distance_to(h);
             let path = h.path();
             let path_len = path.iter().fold(0, |n, &(_, i)| n+i);
-            if dist == path_len { Ok(true) } else {
+            if dist == path_len.try_into().unwrap() { Ok(true) } else {
                 Err(format!("dist = {:?} path_len = {:?} path = {:?}", dist, path_len, path))
             }
         }
@@ -511,7 +523,7 @@ mod tests {
     #[test]
     fn ring_distance() {
         fn prop(h: Hex, r: SmallNonNegativeInt) -> bool {
-            h.ring(r.0).all(|h2| { h.distance_to(h2) == r.0 })
+            h.ring(r.0).all(|h2| { h.distance_to(h2) == r.0.try_into().unwrap() })
         }
         quickcheck(prop as fn(Hex, SmallNonNegativeInt) -> bool);
     }
@@ -527,7 +539,7 @@ mod tests {
     // The distance from hexes in a hex area to the origin is <= the radius of the area.
     #[test]
     fn area_distance() {
-        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool { h.area(r.0).all(|h2| h.distance_to(h2) <= r.0) }
+        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool { h.area(r.0).all(|h2| h.distance_to(h2) <= r.0.try_into().unwrap()) }
         quickcheck(prop as fn(Hex, SmallNonNegativeInt) -> bool);
     }
 
