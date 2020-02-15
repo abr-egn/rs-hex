@@ -196,10 +196,6 @@ impl<C: HexCoord> Hex<C> {
                     .ray(dir, radius.clone())
             })
     }
-}
-
-// TODO(aegnor): this is for Hex<i32>; make them generic
-impl Hex {
     /// A straight line to the target hex, not including `self`.
     ///
     /// # Examples
@@ -209,11 +205,15 @@ impl Hex {
     /// let h = Hex{x:1,y:2};
     /// assert_eq!(ORIGIN.line_to(h).last().unwrap(), h);
     /// ```
-    pub fn line_to(&self, other: Hex) -> impl Iterator<Item=Hex> {
-        let copy = *self;
-        let n = copy.distance_to(other);
-        let step = 1.0 / cmp::max(n, 1) as f32;
-        (0..n+1).map(move |i| hex_lerp(copy, other, step*(i as f32)).round())
+    pub fn line_to(&self, other: Hex<C>) -> impl Iterator<Item=Hex<C>>
+        where C: num_traits::FromPrimitive
+    {
+        let n = self.distance_to(other.clone());
+        let step = 1.0 / cmp::max(n.clone(), num_traits::one()).to_f32().unwrap();
+        let start = FHex::new(self.clone());
+        let end = FHex::new(other);
+        num_iter::range_inclusive(num_traits::zero(), n)
+            .map(move |i| start.lerp(&end, step*(i.to_f32().unwrap())).round())
     }
 }
 
@@ -305,30 +305,39 @@ pub fn parallelogram<C: HexCoord>(a1: Axis, a2: Axis,
 struct FHex { x: f32, y: f32, z: f32 }
 
 impl FHex {
-    fn round(&self) -> Hex {
-        let mut x = self.x.round() as i32;
-        let mut y = self.y.round() as i32;
-        let z = self.z.round() as i32;
-        let x_diff = (x as f32 - self.x).abs();
-        let y_diff = (y as f32 - self.y).abs();
-        let z_diff = (z as f32 - self.z).abs();
+    fn new<C: HexCoord>(h: Hex<C>) -> FHex {
+        FHex {
+            x: (h.x().to_f32().unwrap()),
+            y: (h.y().to_f32().unwrap()),
+            z: (h.z().to_f32().unwrap()),
+        }
+    }
+    fn lerp(&self, other: &FHex, t: f32) -> FHex {
+        FHex {
+            x: self.x + (other.x - self.x)*t,
+            y: self.y + (other.y - self.y)*t,
+            z: self.z + (other.z - self.z)*t,
+        }
+    }
+    fn round<C: HexCoord + num_traits::FromPrimitive>(&self) -> Hex<C> {
+        let round_x = self.x.round();
+        let round_y = self.y.round();
+        let round_z = self.z.round();
+        let mut x: C = num_traits::FromPrimitive::from_f32(round_x).unwrap();
+        let mut y: C = num_traits::FromPrimitive::from_f32(round_y).unwrap();
+        let z: C = num_traits::FromPrimitive::from_f32(round_z).unwrap();
+        let x_diff = (round_x - self.x).abs();
+        let y_diff = (round_y - self.y).abs();
+        let z_diff = (round_z - self.z).abs();
         if x_diff > y_diff && x_diff > z_diff {
-            x = -y - z;
+            x = -y.clone() - z;
         } else if y_diff > z_diff {
-            y = -x - z;
+            y = -x.clone() - z;
         } else {
             // z is unused for the result
             // z = -x - y;
         }
         Hex {x: x, y: y}
-    }
-}
-
-fn hex_lerp(a: Hex, b: Hex, t: f32) -> FHex {
-    FHex {
-        x: (a.x() as f32) + ((b.x() - a.x()) as f32)*t,
-        y: (a.y() as f32) + ((b.y() - a.y()) as f32)*t,
-        z: (a.z() as f32) + ((b.z() - a.z()) as f32)*t,
     }
 }
 
