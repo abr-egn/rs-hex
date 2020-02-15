@@ -3,9 +3,10 @@ mod test_util;
 
 pub mod gosper;
 
-use std::cmp;
-use std::ops::{Add,Sub,Mul,RangeFrom};
-
+use std::{
+    cmp,
+    ops::{Add,Sub,Mul,Range,RangeFrom},
+};
 use num_traits;
 
 /// A hex-grid coordinate, using cubic notation.
@@ -18,12 +19,12 @@ pub struct Delta<T = i32> { pub dx: T, pub dy: T }
 
 pub static ORIGIN: Hex = Hex {x: 0, y: 0};
 
-pub trait HexCoord: Clone + num_traits::Num + num_traits::Signed {
+pub trait HexCoord: Clone + Ord + num_traits::Num + num_traits::Signed {
     fn half(self) -> Self;
     fn neg_one() -> Self;
 }
 
-impl<T> HexCoord for T where T: Clone + num_traits::Num + num_traits::Signed {
+impl<T> HexCoord for T where T: Clone + Ord + num_traits::Num + num_traits::Signed {
     fn neg_one() -> Self { num_traits::zero::<T>() - num_traits::one() }
     fn half(self) -> Self {
         let two = num_traits::one::<T>() + num_traits::one();
@@ -82,9 +83,9 @@ impl<C: HexCoord + Clone> Mul<Delta<C>> for C {
 */
 
 impl<C: HexCoord> Hex<C> {
-    pub fn x(self) -> C { self.x }
-    pub fn y(self) -> C { self.y }
-    pub fn z(self) -> C { - (self.x + self.y) }
+    pub fn x(&self) -> C { self.x.clone() }
+    pub fn y(&self) -> C { self.y.clone() }
+    pub fn z(&self) -> C { - (self.x() + self.y()) }
     /// The distance to the other hex as a straight-line path.
     ///
     /// # Examples
@@ -96,8 +97,7 @@ impl<C: HexCoord> Hex<C> {
     /// assert_eq!(ORIGIN.distance_to(Hex{x:1,y:1}), 2);
     /// assert_eq!(ORIGIN.distance_to(Hex{x:1,y:2}), 3);
     /// ```
-    pub fn distance_to(self, other: Hex<C>) -> C { (self - other).length() }
-
+    pub fn distance_to(&self, other: Hex<C>) -> C { (self.clone() - other).length() }
     /// A sequence of hexes along the given direction, not including `self`.
     ///
     /// # Examples
@@ -112,10 +112,6 @@ impl<C: HexCoord> Hex<C> {
         let h = self.clone();
         (num_traits::one()..).map(move |d| h.clone() + dir.delta()*d)
     }
-}
-
-// TODO(aegnor): this is for Hex<i32>; make them generic
-impl Hex {
     /// The six neighbor coordinates.
     ///
     /// # Examples
@@ -124,12 +120,82 @@ impl Hex {
     /// use hex::{Hex, ORIGIN};
     /// assert!(ORIGIN.neighbors().all(|h| ORIGIN.distance_to(h) == 1));
     /// ```
-    pub fn neighbors(&self) -> impl ExactSizeIterator<Item=Hex> {
-        let h = *self;
-        Box::new(
-            Direction::all().map(move |d| h + d.delta())
-            )
+    pub fn neighbors(&self) -> impl ExactSizeIterator<Item=Hex<C>> {
+        let h = self.clone();
+        Direction::all().map(move |d| h.clone() + d.delta())
     }
+    /// Rotate this hex clockwise or counter-clockwise around another center hex.
+    pub fn rotate_around(&self, center: Hex<C>, dir: Rotation) -> Hex<C> {
+        let x = self.x() - center.x();
+        let y = self.y() - center.y();
+        let z = self.z() - center.z();
+        match dir {
+            Rotation::CW    => Hex { x: center.x - y, y: center.y - z },
+            Rotation::CCW   => Hex { x: center.x - z, y: center.y - x },
+        }
+    }
+    /// Direction-aligned path from the origin to this hex, as (direction, number of steps).
+    pub fn path(&self) -> Vec<(Direction, C)> {
+        let mut coords = [(Axis::X, self.x()), (Axis::Y, self.y()), (Axis::Z, self.z())];
+        coords.sort_by(|&(_, ref a), &(_, ref b)| a.abs().cmp(&b.abs()));
+        let (least, minor, major) = (coords[0].clone(), coords[1].clone(), coords[2].clone());
+        let align_dir = if least.1 < num_traits::zero() { Axis::direction(major.0, least.0) } else { Axis::direction(least.0, major.0) };
+        let align_mag = least.1.abs();
+        let axis_dir = if minor.1 < num_traits::zero() { Axis::direction(major.0, minor.0) } else { Axis::direction(minor.0, major.0) };
+        let axis_mag = minor.1.abs();
+        vec![(axis_dir.unwrap(), axis_mag), (align_dir.unwrap(), align_mag)]
+    }
+    /// A hexagonal area of cells of given radius centered on this hex.
+    ///
+    /// A zero-radius area is a single hex.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use hex::ORIGIN;
+    /// assert_eq!(ORIGIN.area(0).count(), 1);
+    /// assert_eq!(ORIGIN.area(1).count(), 7);
+    /// ```
+    pub fn area(&self, radius: C) -> impl Iterator<Item=Hex<C>>
+        where Range<C>: Iterator<Item=C>
+    {
+        let copy = self.clone();
+        (-radius.clone()..radius.clone()+num_traits::one()).flat_map(move |q| {
+            let r1 = cmp::max(-radius.clone(), -q.clone() - radius.clone());
+            let r2 = cmp::min(radius.clone(), -q.clone() + radius.clone());
+            let copy = copy.clone();
+            (r1..r2+num_traits::one()).map(move |r| Hex{x:copy.clone().x+q.clone(), y:copy.clone().y+r})
+        })
+    }
+    /// A hexagonal ring of cells of given radius centered on this hex.
+    ///
+    /// A zero-radius ring is invalid, and will panic.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use hex::ORIGIN;
+    /// assert_eq!(ORIGIN.ring(1).count(), 6);
+    /// ```
+    pub fn ring(&self, radius: C) -> impl Iterator<Item=Hex<C>>
+        where RangeFrom<C>: Iterator<Item=C>,
+              C: num_traits::cast::ToPrimitive,
+    {
+        let copy = self.clone();
+        if radius == num_traits::zero() {
+            panic!("zero-radius ring");
+        }
+        RING_SIDES.iter()
+            .flat_map(move |&(start, dir)| {
+                (copy.clone() + start.delta()*radius.clone())
+                    .ray(dir)
+                    .take(radius.to_usize().unwrap())
+            })
+    }
+}
+
+// TODO(aegnor): this is for Hex<i32>; make them generic
+impl Hex {
     /// A straight line to the target hex, not including `self`.
     ///
     /// # Examples
@@ -144,70 +210,6 @@ impl Hex {
         let n = copy.distance_to(other);
         let step = 1.0 / cmp::max(n, 1) as f32;
         (0..n+1).map(move |i| hex_lerp(copy, other, step*(i as f32)).round())
-    }
-    /// Rotate this hex clockwise or counter-clockwise around another center hex.
-    pub fn rotate_around(&self, center: Hex, dir: Rotation) -> Hex {
-        let x = self.x() - center.x();
-        let y = self.y() - center.y();
-        let z = self.z() - center.z();
-        match dir {
-            Rotation::CW    => Hex { x: center.x - y, y: center.y - z },
-            Rotation::CCW   => Hex { x: center.x - z, y: center.y - x },
-        }
-    }
-    /// Direction-aligned path from the origin to this hex, as (direction, number of steps).
-    pub fn path(&self) -> Vec<(Direction, u32)> {
-        let mut coords = [(Axis::X, self.x()), (Axis::Y, self.y()), (Axis::Z, self.z())];
-        coords.sort_by(|&(_, a), &(_, b)| a.abs().cmp(&b.abs()));
-        let (least, minor, major) = (coords[0], coords[1], coords[2]);
-        let align_dir = if least.1 < 0 { Axis::direction(major.0, least.0) } else { Axis::direction(least.0, major.0) };
-        let align_mag = least.1.abs() as u32;
-        let axis_dir = if minor.1 < 0 { Axis::direction(major.0, minor.0) } else { Axis::direction(minor.0, major.0) };
-        let axis_mag = minor.1.abs() as u32;
-        vec![(axis_dir.unwrap(), axis_mag), (align_dir.unwrap(), align_mag)]
-    }
-    /// A hexagonal area of cells of given radius centered on this hex.
-    ///
-    /// A zero-radius area is a single hex.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use hex::ORIGIN;
-    /// assert_eq!(ORIGIN.area(0).count(), 1);
-    /// assert_eq!(ORIGIN.area(1).count(), 7);
-    /// ```
-    pub fn area(&self, radius: u32) -> impl Iterator<Item=Hex> {
-        let irad = radius as i32;
-        let copy = *self;
-        (-irad..irad+1).flat_map(move |q| {
-            let r1 = cmp::max(-irad, -q - irad);
-            let r2 = cmp::min(irad, -q + irad);
-            (r1..r2+1).map(move |r| Hex{x:copy.x+q, y:copy.y+r})
-        })
-    }
-    /// A hexagonal ring of cells of given radius centered on this hex.
-    ///
-    /// A zero-radius ring is a single hex.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use hex::ORIGIN;
-    /// assert_eq!(ORIGIN.ring(0).count(), 1);
-    /// assert_eq!(ORIGIN.ring(1).count(), 6);
-    /// ```
-    pub fn ring(&self, radius: u32) -> Box<dyn Iterator<Item=Hex>> {
-        let copy = *self;
-        if radius == 0 {
-            return Box::new(Some(copy).into_iter());
-        }
-        Box::new(RING_SIDES.iter()
-            .flat_map(move |&(start, dir)| {
-                (copy + start.delta()*(radius as i32))
-                    .ray(dir)
-                    .take(radius as usize)
-            }))
     }
 }
 
@@ -271,21 +273,24 @@ static RING_SIDES: [(Direction, Direction); 6] =
      (Direction::ZY, Direction::XZ)];
 
 /// A parallelogram defined by two axes, starting at the origin.
-pub fn parallelogram(a1: Axis, a2: Axis,
-                     a1_size: u32, a2_size: u32) -> impl Iterator<Item=Hex> {
+pub fn parallelogram<C: HexCoord>(a1: Axis, a2: Axis,
+                     a1_size: C, a2_size: C) -> impl Iterator<Item=Hex<C>>
+    where Range<C>: Iterator<Item=C>
+    {
     assert!(a1 != a2);
-    (0..a1_size as i32).flat_map(
-        move |a1_val| (0..a2_size as i32).map(
+    (num_traits::zero()..a1_size).flat_map(
+        move |a1_val| (num_traits::zero()..a2_size.clone()).map(
             move |a2_val| {
                 let x;
                 let y;
+                let a1_val = a1_val.clone();
                 match (a1, a2) {
                     (Axis::X, Axis::Y) => { x = a1_val; y = a2_val; }
-                    (Axis::X, Axis::Z) => { x = a1_val; y = -x - a2_val; }
+                    (Axis::X, Axis::Z) => { x = a1_val; y = -x.clone() - a2_val; }
                     (Axis::Y, Axis::X) => { y = a1_val; x = a2_val; }
-                    (Axis::Y, Axis::Z) => { y = a1_val; x = -y - a2_val; }
-                    (Axis::Z, Axis::X) => { x = a2_val; y = -x - a1_val; }
-                    (Axis::Z, Axis::Y) => { y = a2_val; x = -y - a1_val; }
+                    (Axis::Y, Axis::Z) => { y = a1_val; x = -y.clone() - a2_val; }
+                    (Axis::Z, Axis::X) => { x = a2_val; y = -x.clone() - a1_val; }
+                    (Axis::Z, Axis::Y) => { y = a2_val; x = -y.clone() - a1_val; }
                     _ => panic!("Invalid axis combination")
                 }
                 Hex {x: x, y: y}
@@ -515,31 +520,31 @@ mod tests {
                 x => (x as usize)*6,
             }
         }
-        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool { h.ring(r.0).count() == expected(r.0) }
-        quickcheck(prop as fn(Hex, SmallNonNegativeInt) -> bool);
+        fn prop(h: Hex, r: SmallPositiveInt) -> bool { h.ring(r.0 as i32).count() == expected(r.0) }
+        quickcheck(prop as fn(Hex, SmallPositiveInt) -> bool);
     }
 
     // The distance from hexes in a hex ring to the origin is the radius of the ring.
     #[test]
     fn ring_distance() {
-        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool {
-            h.ring(r.0).all(|h2| { h.distance_to(h2) == r.0.try_into().unwrap() })
+        fn prop(h: Hex, r: SmallPositiveInt) -> bool {
+            h.ring(r.0 as i32).all(|h2| { h.distance_to(h2) == r.0.try_into().unwrap() })
         }
-        quickcheck(prop as fn(Hex, SmallNonNegativeInt) -> bool);
+        quickcheck(prop as fn(Hex, SmallPositiveInt) -> bool);
     }
 
     // Number of hexes in a hex area matches the expected function of radius.
     #[test]
     fn area_len() {
         fn expected(r: u32) -> usize { (3*r.pow(2) + 3*r + 1) as usize }
-        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool { h.area(r.0).count() == expected(r.0) }
+        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool { h.area(r.0 as i32).count() == expected(r.0) }
         quickcheck(prop as fn(Hex, SmallNonNegativeInt) -> bool);
     }
 
     // The distance from hexes in a hex area to the origin is <= the radius of the area.
     #[test]
     fn area_distance() {
-        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool { h.area(r.0).all(|h2| h.distance_to(h2) <= r.0.try_into().unwrap()) }
+        fn prop(h: Hex, r: SmallNonNegativeInt) -> bool { h.area(r.0 as i32).all(|h2| h.distance_to(h2) <= r.0.try_into().unwrap()) }
         quickcheck(prop as fn(Hex, SmallNonNegativeInt) -> bool);
     }
 
