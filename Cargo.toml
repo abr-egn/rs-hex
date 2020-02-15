@@ -4,6 +4,9 @@ version = "0.2.0"
 authors = ["Abraham Egnor <abe.egnor@gmail.com>"]
 edition = "2018"
 
+[dependencies]
+num-iter = "0.1"
+
 [dependencies.num-traits]
 version = "0.2"
 default-features = false

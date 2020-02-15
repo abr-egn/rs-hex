@@ -5,8 +5,9 @@ pub mod gosper;
 
 use std::{
     cmp,
-    ops::{Add,Sub,Mul,Range,RangeFrom},
+    ops::{Add,Sub,Mul},
 };
+use num_iter;
 use num_traits;
 
 /// A hex-grid coordinate, using cubic notation.
@@ -19,12 +20,13 @@ pub struct Delta<T = i32> { pub dx: T, pub dy: T }
 
 pub static ORIGIN: Hex = Hex {x: 0, y: 0};
 
-pub trait HexCoord: Clone + Ord + num_traits::Num + num_traits::Signed {
+// ToPrimitive is required for num_iter
+pub trait HexCoord: Clone + Ord + num_traits::Num + num_traits::Signed + num_traits::ToPrimitive {
     fn half(self) -> Self;
     fn neg_one() -> Self;
 }
 
-impl<T> HexCoord for T where T: Clone + Ord + num_traits::Num + num_traits::Signed {
+impl<T> HexCoord for T where T: Clone + Ord + num_traits::Num + num_traits::Signed + num_traits::ToPrimitive {
     fn neg_one() -> Self { num_traits::zero::<T>() - num_traits::one() }
     fn half(self) -> Self {
         let two = num_traits::one::<T>() + num_traits::one();
@@ -64,6 +66,14 @@ impl<C: HexCoord> Sub<Hex<C>> for Hex<C> {
     }
 }
 
+impl<C: HexCoord> Sub<Delta<C>> for Hex<C> {
+    type Output = Hex<C>;
+
+    fn sub(self, Delta {dx, dy}: Delta<C>) -> Self::Output {
+        Hex {x: self.x-dx, y: self.y-dy}
+    }
+}
+
 impl<C: HexCoord> Mul<C> for Delta<C> {
     type Output = Self;
 
@@ -98,19 +108,19 @@ impl<C: HexCoord> Hex<C> {
     /// assert_eq!(ORIGIN.distance_to(Hex{x:1,y:2}), 3);
     /// ```
     pub fn distance_to(&self, other: Hex<C>) -> C { (self.clone() - other).length() }
-    /// A sequence of hexes along the given direction, not including `self`.
+    /// A sequence of hexes along the given direction, including `self`.
     ///
     /// # Examples
     ///
     /// ```
     /// use hex::{Hex, Direction, ORIGIN};
-    /// assert_eq!(ORIGIN.ray(Direction::XY).nth(4).unwrap(), Hex {x:5,y:-5});
+    /// assert_eq!(ORIGIN.ray(Direction::XY, 6).nth(5).unwrap(), Hex {x:5,y:-5});
     /// ```
-    pub fn ray(&self, dir: Direction) -> impl Iterator<Item=Hex<C>>
-        where RangeFrom<C>: Iterator<Item=C>
+    pub fn ray(&self, dir: Direction, size: C) -> impl Iterator<Item=Hex<C>>
     {
         let h = self.clone();
-        (num_traits::one()..).map(move |d| h.clone() + dir.delta()*d)
+        num_iter::range(num_traits::zero(), size)
+            .map(move |d| h.clone() + dir.delta()*d)
     }
     /// The six neighbor coordinates.
     ///
@@ -157,14 +167,13 @@ impl<C: HexCoord> Hex<C> {
     /// assert_eq!(ORIGIN.area(1).count(), 7);
     /// ```
     pub fn area(&self, radius: C) -> impl Iterator<Item=Hex<C>>
-        where Range<C>: Iterator<Item=C>
     {
         let copy = self.clone();
-        (-radius.clone()..radius.clone()+num_traits::one()).flat_map(move |q| {
+        num_iter::range_inclusive(-radius.clone(), radius.clone()).flat_map(move |q| {
             let r1 = cmp::max(-radius.clone(), -q.clone() - radius.clone());
             let r2 = cmp::min(radius.clone(), -q.clone() + radius.clone());
             let copy = copy.clone();
-            (r1..r2+num_traits::one()).map(move |r| Hex{x:copy.clone().x+q.clone(), y:copy.clone().y+r})
+            num_iter::range_inclusive(r1, r2).map(move |r| Hex{x:copy.clone().x+q.clone(), y:copy.clone().y+r})
         })
     }
     /// A hexagonal ring of cells of given radius centered on this hex.
@@ -178,18 +187,13 @@ impl<C: HexCoord> Hex<C> {
     /// assert_eq!(ORIGIN.ring(1).count(), 6);
     /// ```
     pub fn ring(&self, radius: C) -> impl Iterator<Item=Hex<C>>
-        where RangeFrom<C>: Iterator<Item=C>,
-              C: num_traits::cast::ToPrimitive,
     {
         let copy = self.clone();
-        if radius == num_traits::zero() {
-            panic!("zero-radius ring");
-        }
+        assert!(radius != num_traits::zero());
         RING_SIDES.iter()
             .flat_map(move |&(start, dir)| {
                 (copy.clone() + start.delta()*radius.clone())
-                    .ray(dir)
-                    .take(radius.to_usize().unwrap())
+                    .ray(dir, radius.clone())
             })
     }
 }
@@ -275,11 +279,10 @@ static RING_SIDES: [(Direction, Direction); 6] =
 /// A parallelogram defined by two axes, starting at the origin.
 pub fn parallelogram<C: HexCoord>(a1: Axis, a2: Axis,
                      a1_size: C, a2_size: C) -> impl Iterator<Item=Hex<C>>
-    where Range<C>: Iterator<Item=C>
     {
     assert!(a1 != a2);
-    (num_traits::zero()..a1_size).flat_map(
-        move |a1_val| (num_traits::zero()..a2_size.clone()).map(
+    num_iter::range(num_traits::zero(), a1_size).flat_map(
+        move |a1_val| num_iter::range(num_traits::zero(), a2_size.clone()).map(
             move |a2_val| {
                 let x;
                 let y;
@@ -464,8 +467,8 @@ mod tests {
     #[test]
     fn ray_delta() {
         fn prop(h: Hex, d: Direction, i: SmallPositiveInt) -> bool {
-            let mut prev = h;
-            h.ray(d).take(i.0 as usize).all(|pt| {
+            let mut prev = h - d.delta();
+            h.ray(d, i.0 as i32).all(|pt| {
                 let cmp = (pt - prev) == d.delta();
                 prev = pt;
                 cmp
@@ -514,12 +517,7 @@ mod tests {
     // Number of hexes in a hex ring matches the expected function of radius.
     #[test]
     fn ring_len() {
-        fn expected(r: u32) -> usize {
-            match r {
-                0 => 1,
-                x => (x as usize)*6,
-            }
-        }
+        fn expected(r: u32) -> usize { (r as usize)*6 }
         fn prop(h: Hex, r: SmallPositiveInt) -> bool { h.ring(r.0 as i32).count() == expected(r.0) }
         quickcheck(prop as fn(Hex, SmallPositiveInt) -> bool);
     }
