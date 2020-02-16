@@ -9,13 +9,14 @@ use std::{
 };
 use num_iter;
 use num_traits;
+use serde::{Serialize,Deserialize};
 
 /// A hex-grid coordinate, using cubic notation.
-#[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash)]
+#[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash, Serialize, Deserialize)]
 pub struct Hex<T = i32> { pub x: T, pub y: T }
 
 /// The difference between two `Hex` coordinates.
-#[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash)]
+#[derive(PartialEq, Eq, Copy, Clone, Default, Debug, Hash, Serialize, Deserialize)]
 pub struct Delta<T = i32> { pub dx: T, pub dy: T }
 
 pub static ORIGIN: Hex = Hex {x: 0, y: 0};
@@ -238,7 +239,7 @@ impl Delta {
 }
 
 /// The six cardinal directions of movement, named as `<increment coordinate><decrement coordinate>`.
-#[derive(PartialEq, Eq, Copy, Clone, Hash, Debug)]
+#[derive(PartialEq, Eq, Copy, Clone, Hash, Debug, Serialize, Deserialize)]
 pub enum Direction { XY, XZ, YZ, YX, ZX, ZY }
 
 impl Direction {
@@ -337,10 +338,10 @@ impl FHex {
 }
 
 /// Clockwise or counter-clockwise rotation.
-#[derive(PartialEq, Eq, Copy, Clone, Hash, Debug)]
+#[derive(PartialEq, Eq, Copy, Clone, Hash, Debug, Serialize, Deserialize)]
 pub enum Rotation { CW, CCW }
 
-#[derive(PartialEq, Eq, Copy, Clone, Hash, Debug)]
+#[derive(PartialEq, Eq, Copy, Clone, Hash, Debug, Serialize, Deserialize)]
 pub enum Axis { X, Y, Z }
 
 impl Axis {
