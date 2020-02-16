@@ -21,18 +21,9 @@ pub struct Delta<T = i32> { pub dx: T, pub dy: T }
 pub static ORIGIN: Hex = Hex {x: 0, y: 0};
 
 // ToPrimitive is required for num_iter
-pub trait HexCoord: Clone + Ord + num_traits::Num + num_traits::Signed + num_traits::ToPrimitive {
-    fn half(self) -> Self;
-    fn neg_one() -> Self;
-}
+pub trait HexCoord: Clone + Ord + num_traits::Num + num_traits::Signed + num_traits::ToPrimitive { }
 
-impl<T> HexCoord for T where T: Clone + Ord + num_traits::Num + num_traits::Signed + num_traits::ToPrimitive {
-    fn neg_one() -> Self { num_traits::zero::<T>() - num_traits::one() }
-    fn half(self) -> Self {
-        let two = num_traits::one::<T>() + num_traits::one();
-        self / two
-    }
-}
+impl<T> HexCoord for T where T: Clone + Ord + num_traits::Num + num_traits::Signed + num_traits::ToPrimitive { }
 
 impl<C: HexCoord> Add<Delta<C>> for Hex<C> {
     type Output = Self;
@@ -230,7 +221,10 @@ impl<C: HexCoord> Delta<C> {
     /// assert_eq!(Delta{dx:0,dy:0}.length(), 0);
     /// assert_eq!(Delta{dx:1,dy:2}.length(), 3);
     /// ```
-    pub fn length(&self) -> C { (self.dx().abs() + self.dy().abs() + self.dz().abs()).half() }
+    pub fn length(&self) -> C {
+        let two = num_traits::one::<C>() + num_traits::one();
+        (self.dx().abs() + self.dy().abs() + self.dz().abs()) / two
+    }
 }
 
 impl Delta {
@@ -253,13 +247,14 @@ impl Direction {
     pub fn all() -> std::slice::Iter<'static, Direction> { DIRECTIONS.iter() }
     /// Returns the `Delta` corresponding to a single move in this `Direction`.
     pub fn delta<C: HexCoord>(self) -> Delta<C> {
+        let neg_one = num_traits::zero::<C>() - num_traits::one();
         match self {
-            Direction::XY => Delta {dx: num_traits::one(), dy: HexCoord::neg_one()},
+            Direction::XY => Delta {dx: num_traits::one(), dy: neg_one},
             Direction::XZ => Delta {dx: num_traits::one(), dy: num_traits::zero()},
             Direction::YZ => Delta {dx: num_traits::zero(), dy: num_traits::one()},
-            Direction::YX => Delta {dx: HexCoord::neg_one(), dy: num_traits::one()},
-            Direction::ZX => Delta {dx: HexCoord::neg_one(), dy: num_traits::zero()},
-            Direction::ZY => Delta {dx: num_traits::zero(), dy: HexCoord::neg_one()},
+            Direction::YX => Delta {dx: neg_one, dy: num_traits::one()},
+            Direction::ZX => Delta {dx: neg_one, dy: num_traits::zero()},
+            Direction::ZY => Delta {dx: num_traits::zero(), dy: neg_one},
         }
     }
 }
