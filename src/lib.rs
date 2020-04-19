@@ -188,7 +188,7 @@ impl<C: HexCoord> Hex<C> {
                     .ray(dir, radius.clone())
             })
     }
-    /// A straight line to the target hex, not including `self`.
+    /// A straight line to the target hex, including `self`.
     ///
     /// # Examples
     ///
@@ -196,6 +196,7 @@ impl<C: HexCoord> Hex<C> {
     /// use hex::{Hex, ORIGIN};
     /// let h = Hex{x:1,y:2};
     /// assert_eq!(ORIGIN.line_to(h).last().unwrap(), h);
+    /// assert_eq!(ORIGIN.line_to(h).count(), 4);
     /// ```
     pub fn line_to(&self, other: Hex<C>) -> impl Iterator<Item=Hex<C>>
         where C: num_traits::FromPrimitive
