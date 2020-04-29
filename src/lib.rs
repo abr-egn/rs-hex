@@ -201,9 +201,24 @@ impl<C: HexCoord> Hex<C> {
     pub fn line_to(&self, other: Hex<C>) -> impl Iterator<Item=Hex<C>>
         where C: num_traits::FromPrimitive
     {
+        self.line_to_impl(other, FHex { x: 1e-6, y: 2e-6, z: -3e-6 })
+    }
+
+    pub fn line_to_alt(&self, other: Hex<C>) -> impl Iterator<Item=Hex<C>>
+        where C: num_traits::FromPrimitive
+    {
+        self.line_to_impl(other, FHex { x: -1e-6, y: -2e-6, z: 3e-6 })
+    }
+
+    fn line_to_impl(&self, other: Hex<C>, offset: FHex) -> impl Iterator<Item=Hex<C>>
+        where C: num_traits::FromPrimitive
+    {
         let n = self.distance_to(other.clone());
         let step = 1.0 / cmp::max(n.clone(), num_traits::one()).to_f32().unwrap();
-        let start = FHex::new(self.clone());
+        let mut start = FHex::new(self.clone());
+        start.x += offset.x;
+        start.y += offset.y;
+        start.z += offset.z;
         let end = FHex::new(other);
         num_iter::range_inclusive(num_traits::zero(), n)
             .map(move |i| start.lerp(&end, step*(i.to_f32().unwrap())).round())
